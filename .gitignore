@@ -1,0 +1,106 @@
+# OS metadata files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Python compilation and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Python virtual environments
+.venv/
+venv/
+ENV/
+env/
+backend/venv/
+backend/.venv/
+
+# Python packaging and builds
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Testing and coverage
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+htmlcov/
+.hypothesis/
+
+# Node / JS dependency directories
+node_modules/
+frontend/node_modules/
+jspm_packages/
+.pnp
+.pnp.js
+.yarn-integrity
+
+# Next.js and frontend build outputs
+.next/
+frontend/.next/
+out/
+frontend/out/
+frontend/build/
+frontend/dist/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment variables / Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+*.env
+*.env.*
+*.pem
+*.key
+
+# IDEs and editors
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+.project
+.classpath
+.settings/
