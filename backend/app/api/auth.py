@@ -14,4 +14,19 @@ async def github_login(request: Request):
 
 @router.get("/github/callback", name="github_callback")
 async def github_callback(request: Request):
-    return {"message": "GitHub callback reached successfully"}
+    token = await oauth.github.authorize_access_token(request)
+
+    response = await oauth.github.get(
+        "user",
+        token=token
+    )
+
+    profile = response.json()
+
+    return {
+        "login": profile["login"],
+        "name": profile["name"],
+        "id": profile["id"],
+        "avatar_url": profile["avatar_url"],
+        "html_url": profile["html_url"],
+    }
