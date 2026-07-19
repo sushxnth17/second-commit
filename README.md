@@ -10,7 +10,7 @@ SecondCommit preserves the story behind the code.
 
 ---
 
-## 🚨 The Problem
+##  The Problem
 
 Developers start thousands of software projects that are never completed.
 
@@ -43,7 +43,7 @@ It does not give them the **context required to continue the project effectively
 
 ---
 
-## 💡 The Solution
+##  The Solution
 
 SecondCommit helps developers create a **structured handoff for unfinished software projects**.
 
@@ -66,7 +66,7 @@ SecondCommit turns an inactive repository into a project that another developer 
 
 ---
 
-## 🤔 Why Not Just Fork the Repository?
+##  Why Not Just Fork the Repository?
 
 GitHub makes it easy to fork code.
 
@@ -90,17 +90,17 @@ It adds the missing **handoff and revival layer** around GitHub projects.
 
 ---
 
-## 🧠 Core Concept: The Revival Brief
+##  Core Concept: The Revival Brief
 
 The **Revival Brief** is the heart of SecondCommit.
 
 When listing an unfinished project, the owner documents the knowledge required to continue it.
 
-### 🎯 Original Vision
+###  Original Vision
 
 What was the project originally supposed to become?
 
-### 🛑 Why Development Stopped
+###  Why Development Stopped
 
 Why is the project no longer actively maintained?
 
