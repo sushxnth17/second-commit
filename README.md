@@ -104,7 +104,7 @@ What was the project originally supposed to become?
 
 Why is the project no longer actively maintained?
 
-### ✅ What Currently Works
+###  What Currently Works
 
 Which features are already functional?
 
@@ -117,7 +117,7 @@ Example:
 ✓ Repository integration
 ```
 
-### 🚧 What Is Incomplete
+###  What Is Incomplete
 
 Which features still need development?
 
@@ -129,29 +129,29 @@ Example:
 □ Deployment configuration
 ```
 
-### 🐛 Known Problems
+###  Known Problems
 
 What bugs, blockers, or architectural problems exist?
 
-### ❌ Failed Approaches
+###  Failed Approaches
 
 What solutions have already been attempted?
 
 This helps future developers avoid repeating the same unsuccessful work.
 
-### 🧹 Technical Debt
+###  Technical Debt
 
 Which parts of the project require refactoring or improvement?
 
-### 🚀 Planned Features
+###  Planned Features
 
 What did the original developer intend to build next?
 
-### 🛠️ Skills Needed
+###  Skills Needed
 
 Which technical skills would be useful for reviving the project?
 
-### 📍 Recommended Starting Point
+###  Recommended Starting Point
 
 What should a new contributor work on first?
 
@@ -226,15 +226,15 @@ The team uses the project's **Revival Roadmap** to understand and track the work
 
 ---
 
-## ✨ Core MVP Features
+##  Core MVP Features
 
-### 🔐 GitHub Authentication
+###  GitHub Authentication
 
 - Sign in with GitHub
 - GitHub-based user identity
 - Display GitHub username and avatar
 
-### 📦 Repository Import
+###  Repository Import
 
 - Fetch authenticated user's repositories
 - Select a repository
@@ -251,7 +251,7 @@ Initial repository metadata includes:
 - Open issues
 - Last repository update
 
-### 📋 Revival Brief
+###  Revival Brief
 
 Project owners can document:
 
@@ -266,7 +266,7 @@ Project owners can document:
 - Skills needed
 - Recommended starting point
 
-### 🔍 Project Discovery
+###  Project Discovery
 
 Developers can:
 
@@ -276,7 +276,7 @@ Developers can:
 - Filter by category
 - Filter by revival intent
 
-### 🤝 Revival Requests
+###  Revival Requests
 
 Developers can request to join a project.
 
@@ -292,13 +292,13 @@ Project owners can:
 - Accept requests
 - Reject requests
 
-### 👥 Revival Team
+###  Revival Team
 
 Accepted developers are added to the project's revival team.
 
 The project page displays the developers involved in the revival.
 
-### 📊 User Dashboard
+###  User Dashboard
 
 The dashboard includes:
 
@@ -309,7 +309,7 @@ The dashboard includes:
 
 ---
 
-## 🔄 Revival Status System
+##  Revival Status System
 
 Projects can move through different revival states.
 
@@ -332,7 +332,7 @@ The status represents the revival state on SecondCommit and does not automatical
 
 ---
 
-## 🗺️ Revival Roadmap
+##  Revival Roadmap
 
 A project can contain a structured revival roadmap.
 
