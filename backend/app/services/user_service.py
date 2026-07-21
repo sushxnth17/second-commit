@@ -13,12 +13,14 @@ def create_user(
     username: str,
     name: str | None,
     avatar_url: str | None,
+    access_token: str,
 ):
     user = User(
         github_id=github_id,
         username=username,
         name=name,
         avatar_url=avatar_url,
+        access_token=access_token,
     )
 
     db.add(user)
@@ -34,10 +36,12 @@ def update_user(
     username: str,
     name: str | None,
     avatar_url: str | None,
+    access_token: str,
 ):
     user.username = username
     user.name = name
     user.avatar_url = avatar_url
+    user.access_token = access_token
 
     db.commit()
     db.refresh(user)

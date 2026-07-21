@@ -1,9 +1,7 @@
-from fastapi import APIRouter, Request
-
-from app.core.github_oauth import oauth
-from fastapi import Depends
+from fastapi import APIRouter, Request, Depends
 from sqlalchemy.orm import Session
 
+from app.core.github_oauth import oauth
 from app.database.database import get_db
 from app.services.user_service import (
     get_user_by_github_id,
@@ -26,7 +24,10 @@ async def github_callback(
     db: Session = Depends(get_db),
 ):
     token = await oauth.github.authorize_access_token(request)
+    
 
+    print(token)
+    
     response = await oauth.github.get(
         "user",
         token=token
@@ -43,7 +44,9 @@ async def github_callback(
             username=profile["login"],
             name=profile.get("name"),
             avatar_url=profile.get("avatar_url"),
+            access_token=token["access_token"],
         )
+        print("Saved access token:", user.access_token)
     else:
         user = update_user(
             db=db,
@@ -51,7 +54,9 @@ async def github_callback(
             username=profile["login"],
             name=profile.get("name"),
             avatar_url=profile.get("avatar_url"),
+            access_token=token["access_token"],
         )
+        print("Updated access token:", user.access_token)
 
     return {
         "message": "Login successful",
@@ -61,5 +66,7 @@ async def github_callback(
             "username": user.username,
             "name": user.name,
             "avatar_url": user.avatar_url,
-    },
-}
+            # Remove this in production
+            "access_token": user.access_token,
+        },
+    }

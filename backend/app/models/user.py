@@ -21,7 +21,10 @@ class User(Base):
     avatar_url: Mapped[str | None] = mapped_column(
         nullable=True
     )
-
+    access_token: Mapped[str | None] = mapped_column(
+        nullable=True
+    )
+    
     repositories = relationship(
         "Repository",
         back_populates="owner",
