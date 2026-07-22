@@ -157,27 +157,27 @@ What should a new contributor work on first?
 
 ---
 
-## 🔄 How SecondCommit Works
+##  How SecondCommit Works
 
-### 1️⃣ Sign In with GitHub
+###  Sign In with GitHub
 
 Developers authenticate using their GitHub account.
 
 GitHub provides the developer identity used by SecondCommit.
 
-### 2️⃣ Import a Repository
+###  Import a Repository
 
 The project owner selects a GitHub repository they want to hand off or revive.
 
 Basic repository information is imported using the GitHub API.
 
-### 3️⃣ Create a Revival Brief
+###  Create a Revival Brief
 
 The owner documents the project's current state.
 
 SecondCommit guides the owner through a structured handoff process instead of asking for a simple project description.
 
-### 4️⃣ Choose a Revival Intent
+###  Choose a Revival Intent
 
 The project owner specifies what kind of help they need.
 
@@ -188,7 +188,7 @@ Available revival intents include:
 - Looking for a New Maintainer
 - Available for Complete Handoff
 
-### 5️⃣ Publish the Project
+###  Publish the Project
 
 The project becomes discoverable on SecondCommit.
 
@@ -200,13 +200,13 @@ Developers can search for projects based on:
 - Required skills
 - Revival intent
 
-### 6️⃣ Understand Before Contributing
+###  Understand Before Contributing
 
 Interested developers read the Revival Brief before deciding to join.
 
 They can understand the project context without spending days reverse-engineering the repository.
 
-### 7️⃣ Request to Join the Revival
+###  Request to Join the Revival
 
 Developers send a revival request explaining:
 
@@ -214,13 +214,13 @@ Developers send a revival request explaining:
 - Why they are interested
 - How they want to contribute
 
-### 8️⃣ Build the Revival Team
+###  Build the Revival Team
 
 The project owner reviews requests and accepts suitable developers.
 
 Accepted developers become part of the project's revival team.
 
-### 9️⃣ Continue the Project
+###  Continue the Project
 
 The team uses the project's **Revival Roadmap** to understand and track the work required to bring the project back to active development.
 
@@ -368,7 +368,7 @@ Advanced GitHub issue synchronization is outside the initial MVP.
 
 ---
 
-## ❤️ Project Health Signals
+##  Project Health Signals
 
 A future version of SecondCommit may analyze repository signals to provide project health indicators.
 
@@ -400,7 +400,7 @@ Only the project owner can explicitly list a project for revival on SecondCommit
 
 ---
 
-## 🤖 Planned AI Handoff Assistant
+##  Planned AI Handoff Assistant
 
 AI features are planned after the core handoff workflow is functional.
 
@@ -436,7 +436,7 @@ SecondCommit should never assume that repository analysis fully understands the 
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Frontend
 
@@ -470,7 +470,7 @@ SecondCommit should never assume that repository analysis fully understands the 
 
 ---
 
-## 📁 Proposed Project Architecture
+##  Proposed Project Architecture
 
 ```text
 second-commit/
