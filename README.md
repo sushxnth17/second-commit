@@ -616,7 +616,7 @@ second-commit/
 
 ---
 
-## 🎯 MVP Scope
+##  MVP Scope
 
 The first release of SecondCommit focuses on one complete workflow:
 
@@ -658,7 +658,7 @@ The core handoff and revival experience will be validated before these features 
 
 ---
 
-## 🧭 Project Philosophy
+##  Project Philosophy
 
 Starting a project is easy.
 
@@ -676,7 +676,7 @@ Don't just fork abandoned code.
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 SecondCommit is currently in the planning and initial development stage.
 
@@ -694,7 +694,7 @@ Future contribution areas may include:
 
 ---
 
-## 🚧 Project Status
+##  Project Status
 
 **Status: Planning and Initial Development**
 
@@ -702,7 +702,7 @@ The core product concept, MVP scope, and technical architecture are currently be
 
 ---
 
-## 📄 License
+##  License
 
 The project license will be finalized before the first public release.
 
