@@ -7,7 +7,10 @@ from app.services.github_service import get_user_repositories
 from app.services.repository_service import (
     get_repository_by_github_id,
     create_repository,
+    get_repositories_by_owner,
 )
+from app.schemas import RepositoryResponse
+
 
 router = APIRouter(
     prefix="/repositories",
@@ -74,3 +77,23 @@ async def import_repository(
             "full_name": repository.full_name,
         },
     }
+
+
+@router.get("/{github_id}", response_model=list[RepositoryResponse])
+async def get_repositories(
+    github_id: int,
+    db: Session = Depends(get_db),
+):
+    user = (
+        db.query(User)
+        .filter(User.github_id == github_id)
+        .first()
+    )
+    if user is None:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found",
+        )
+
+    repositories = get_repositories_by_owner(db, user.id)
+    return repositories

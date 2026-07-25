@@ -35,3 +35,11 @@ def create_repository(
     db.refresh(repository)
 
     return repository
+
+
+def get_repositories_by_owner(db: Session, owner_id: int):
+    return (
+        db.query(Repository)
+        .filter(Repository.owner_id == owner_id)
+        .all()
+    )
