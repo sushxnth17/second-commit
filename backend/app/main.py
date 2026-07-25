@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
-
+from app.api.github import router as github_router
 from app.api.routes import router as root_router
 from app.api.auth import router as auth_router
 from app.core.config import settings
@@ -18,3 +18,4 @@ app.add_middleware(
 
 app.include_router(root_router)
 app.include_router(auth_router)
+app.include_router(github_router)
