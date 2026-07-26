@@ -101,6 +101,14 @@ def test_get_repositories_endpoint(client, db_session):
         "language",
         "default_branch",
         "html_url",
+        "stars",
+        "forks",
+        "watchers",
+        "open_issues",
+        "size",
+        "created_at",
+        "updated_at",
+        "pushed_at",
     }
     assert set(repo_data.keys()) == expected_keys
 
@@ -119,3 +127,131 @@ def test_get_repositories_endpoint_user_not_found(client):
     response = client.get("/repositories/9999999")
     assert response.status_code == 404
     assert response.json()["detail"] == "User not found"
+
+
+def test_sync_repository_success(client, db_session, mocker):
+    from app.models.repository import Repository
+    
+    # 1. Create a test user
+    user = create_user(
+        db=db_session,
+        github_id=98765,
+        username="syncuser",
+        name="Sync User",
+        avatar_url="https://avatar.url",
+        access_token="sync_token",
+    )
+
+    # 2. Create a repository for the user
+    repo = create_repository(
+        db=db_session,
+        owner_id=user.id,
+        repo={
+            "id": 888,
+            "name": "sync-repo",
+            "full_name": "syncuser/sync-repo",
+            "description": "Original description",
+            "html_url": "https://github.com/syncuser/sync-repo",
+            "language": "Python",
+            "default_branch": "main",
+        },
+    )
+
+    # 3. Mock GitHub API call in github_service
+    mocker.patch(
+        "app.api.repositories.get_repository_details",
+        return_value={
+            "id": 888,
+            "name": "sync-repo-updated",
+            "full_name": "syncuser/sync-repo-updated",
+            "description": "Updated description",
+            "html_url": "https://github.com/syncuser/sync-repo-updated",
+            "language": "Python",
+            "default_branch": "main",
+            "stargazers_count": 42,
+            "forks_count": 7,
+            "watchers_count": 12,
+            "open_issues_count": 3,
+            "size": 1500,
+            "created_at": "2026-07-26T12:00:00Z",
+            "updated_at": "2026-07-26T15:00:00Z",
+            "pushed_at": "2026-07-26T16:00:00Z",
+        }
+    )
+
+    # 4. Call sync endpoint
+    response = client.post(f"/repositories/{repo.id}/sync")
+
+    # 5. Assertions
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == repo.id
+    assert data["name"] == "sync-repo-updated"
+    assert data["full_name"] == "syncuser/sync-repo-updated"
+    assert data["description"] == "Updated description"
+    assert data["stars"] == 42
+    assert data["forks"] == 7
+    assert data["watchers"] == 12
+    assert data["open_issues"] == 3
+    assert data["size"] == 1500
+    assert data["created_at"] is not None
+    assert data["updated_at"] is not None
+    assert data["pushed_at"] is not None
+
+    # Check that DB was also updated
+    db_session.expire_all()
+    db_repo = db_session.query(Repository).filter(Repository.id == repo.id).first()
+    assert db_repo.name == "sync-repo-updated"
+    assert db_repo.stars == 42
+
+
+def test_sync_repository_not_found(client):
+    response = client.post("/repositories/99999/sync")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Repository not found"
+
+
+def test_sync_repository_github_failure(client, db_session, mocker):
+    import httpx
+    
+    # 1. Create a test user
+    user = create_user(
+        db=db_session,
+        github_id=98765,
+        username="syncuser",
+        name="Sync User",
+        avatar_url="https://avatar.url",
+        access_token="sync_token",
+    )
+
+    # 2. Create a repository for the user
+    repo = create_repository(
+        db=db_session,
+        owner_id=user.id,
+        repo={
+            "id": 888,
+            "name": "sync-repo",
+            "full_name": "syncuser/sync-repo",
+            "description": "Original description",
+            "html_url": "https://github.com/syncuser/sync-repo",
+            "language": "Python",
+            "default_branch": "main",
+        },
+    )
+
+    # 3. Mock get_repository_details to raise HTTPStatusError
+    mock_response = httpx.Response(
+        status_code=500,
+        request=httpx.Request("GET", f"https://api.github.com/repos/{repo.full_name}")
+    )
+    mocker.patch(
+        "app.api.repositories.get_repository_details",
+        side_effect=httpx.HTTPStatusError("GitHub error", request=mock_response.request, response=mock_response)
+    )
+
+    # 4. Call sync endpoint
+    response = client.post(f"/repositories/{repo.id}/sync")
+
+    # 5. Assertions
+    assert response.status_code == 502
+    assert "GitHub API failure" in response.json()["detail"]
