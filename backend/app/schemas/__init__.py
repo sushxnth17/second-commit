@@ -3,6 +3,7 @@ from .dashboard import DashboardResponse, UserSummary, RepositorySummary
 from .health import HealthResponse
 from .dormancy import DormancyResponse
 from .analytics import AnalyticsResponse
+from .ai import AIInsightsResponse
 
 __all__ = [
     "RepositoryResponse",
@@ -12,7 +13,9 @@ __all__ = [
     "HealthResponse",
     "DormancyResponse",
     "AnalyticsResponse",
+    "AIInsightsResponse",
 ]
+
 
 
 
