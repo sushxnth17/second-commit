@@ -11,6 +11,7 @@ from app.services.repository_service import (
     create_repository,
     get_repositories_by_owner,
     update_repository,
+    get_repository_by_id,
 )
 from app.schemas import RepositoryResponse
 
@@ -82,24 +83,30 @@ async def import_repository(
     }
 
 
-@router.get("/{github_id}", response_model=list[RepositoryResponse])
-async def get_repositories(
-    github_id: int,
+@router.get("/{id_val}", response_model=list[RepositoryResponse] | RepositoryResponse)
+async def get_repository_or_repositories(
+    id_val: int,
     db: Session = Depends(get_db),
 ):
+    # 1. Try to find a user by github_id
     user = (
         db.query(User)
-        .filter(User.github_id == github_id)
+        .filter(User.github_id == id_val)
         .first()
     )
-    if user is None:
+    if user is not None:
+        return get_repositories_by_owner(db, user.id)
+
+    # 2. If no user is found, try to find a repository by repository_id
+    try:
+        return get_repository_by_id(db, id_val)
+    except ValueError as e:
         raise HTTPException(
             status_code=404,
-            detail="User not found",
+            detail=str(e) if id_val < 1000000 else "User not found",
         )
 
-    repositories = get_repositories_by_owner(db, user.id)
-    return repositories
+
 
 
 @router.post("/{repository_id}/sync", response_model=RepositoryResponse)

@@ -255,3 +255,61 @@ def test_sync_repository_github_failure(client, db_session, mocker):
     # 5. Assertions
     assert response.status_code == 502
     assert "GitHub API failure" in response.json()["detail"]
+
+
+def test_get_repository_by_id_success(client, db_session):
+    # 1. Create a test user
+    user = create_user(
+        db=db_session,
+        github_id=123456,
+        username="detailuser",
+        name="Detail User",
+        avatar_url="https://avatar.url",
+        access_token="detail_token",
+    )
+
+    # 2. Create a repository
+    repo = create_repository(
+        db=db_session,
+        owner_id=user.id,
+        repo={
+            "id": 777,
+            "name": "detail-repo",
+            "full_name": "detailuser/detail-repo",
+            "description": "Detail repo description",
+            "html_url": "https://github.com/detailuser/detail-repo",
+            "language": "Python",
+            "default_branch": "main",
+            "stargazers_count": 10,
+            "forks_count": 2,
+            "watchers_count": 5,
+            "open_issues_count": 1,
+            "size": 500,
+        },
+    )
+
+    # 3. Call the API endpoint
+    response = client.get(f"/repositories/{repo.id}")
+
+    # 4. Assert response
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == repo.id
+    assert data["github_repo_id"] == 777
+    assert data["name"] == "detail-repo"
+    assert data["full_name"] == "detailuser/detail-repo"
+    assert data["description"] == "Detail repo description"
+    assert data["language"] == "Python"
+    assert data["default_branch"] == "main"
+    assert data["html_url"] == "https://github.com/detailuser/detail-repo"
+    assert data["stars"] == 10
+    assert data["forks"] == 2
+    assert data["watchers"] == 5
+    assert data["open_issues"] == 1
+    assert data["size"] == 500
+
+
+def test_get_repository_by_id_not_found(client):
+    response = client.get("/repositories/999999")
+    assert response.status_code == 404
+

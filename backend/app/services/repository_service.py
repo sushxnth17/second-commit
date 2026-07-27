@@ -93,4 +93,16 @@ def get_repositories_by_owner(db: Session, owner_id: int):
         db.query(Repository)
         .filter(Repository.owner_id == owner_id)
         .all()
-    )
+    )
+
+
+def get_repository_by_id(db: Session, repository_id: int) -> Repository:
+    repository = (
+        db.query(Repository)
+        .filter(Repository.id == repository_id)
+        .first()
+    )
+    if not repository:
+        raise ValueError("Repository not found")
+    return repository
+
