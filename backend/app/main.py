@@ -8,6 +8,7 @@ from app.api.repositories import router as repository_router
 from app.api.dashboard import router as dashboard_router
 from app.api.health import router as health_router
 from app.api.dormancy import router as dormancy_router
+from app.api.analytics import router as analytics_router
 
 app = FastAPI(
     title="SecondCommit API",
@@ -27,5 +28,7 @@ app.include_router(repository_router)
 app.include_router(dashboard_router)
 app.include_router(health_router)
 app.include_router(dormancy_router)
+app.include_router(analytics_router)
+
 
 
