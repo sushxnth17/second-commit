@@ -3,6 +3,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
+from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.repository import Repository
 from app.services.github_service import get_user_repositories, get_repository_details
@@ -22,25 +23,19 @@ router = APIRouter(
 )
 
 
-@router.post("/import/{github_id}/{repo_id}")
+@router.post("/import/{repo_id}")
 async def import_repository(
-    github_id: int,
     repo_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    user = (
-        db.query(User)
-        .filter(User.github_id == github_id)
-        .first()
-    )
-
-    if user is None:
+    if not current_user.access_token:
         raise HTTPException(
-            status_code=404,
-            detail="User not found",
+            status_code=400,
+            detail="Access token not found",
         )
 
-    repos = await get_user_repositories(user.access_token)
+    repos = await get_user_repositories(current_user.access_token)
 
     repo = next(
         (r for r in repos if r["id"] == repo_id),
@@ -69,7 +64,7 @@ async def import_repository(
 
     repository = create_repository(
         db=db,
-        owner_id=user.id,
+        owner_id=current_user.id,
         repo=repo,
     )
 
@@ -83,36 +78,42 @@ async def import_repository(
     }
 
 
-@router.get("/{id_val}", response_model=list[RepositoryResponse] | RepositoryResponse)
-async def get_repository_or_repositories(
-    id_val: int,
+@router.get("", response_model=list[RepositoryResponse])
+async def list_user_repositories(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    # 1. Try to find a user by github_id
-    user = (
-        db.query(User)
-        .filter(User.github_id == id_val)
-        .first()
-    )
-    if user is not None:
-        return get_repositories_by_owner(db, user.id)
+    return get_repositories_by_owner(db, current_user.id)
 
-    # 2. If no user is found, try to find a repository by repository_id
+
+@router.get("/{repository_id}", response_model=RepositoryResponse)
+async def get_repository(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
-        return get_repository_by_id(db, id_val)
+        repository = get_repository_by_id(db, repository_id)
     except ValueError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e) if id_val < 1000000 else "User not found",
+            detail=str(e),
         )
 
+    if repository.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
 
+    return repository
 
 
 @router.post("/{repository_id}/sync", response_model=RepositoryResponse)
 async def sync_repository(
     repository_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     repository = (
         db.query(Repository)
@@ -120,7 +121,7 @@ async def sync_repository(
         .first()
     )
 
-    if not repository:
+    if not repository or repository.owner_id != current_user.id:
         raise HTTPException(
             status_code=404,
             detail="Repository not found",

@@ -97,7 +97,15 @@ def test_get_repository_health_endpoint(client, db_session):
     assert "summary" in data
 
 
-def test_get_repository_health_not_found(client):
+def test_get_repository_health_not_found(client, db_session):
+    create_user(
+        db=db_session,
+        github_id=44444,
+        username="healthuser",
+        name="Health User",
+        avatar_url="https://avatar.url",
+        access_token="health_token",
+    )
     response = client.get("/repositories/999999/health")
     assert response.status_code == 404
     assert response.json()["detail"] == "Repository not found"

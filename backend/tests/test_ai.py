@@ -61,7 +61,15 @@ def test_get_repository_ai_insights_success(client, db_session, mocker):
     assert data["ai_score"] == 88.5
 
 
-def test_get_repository_ai_insights_not_found(client):
+def test_get_repository_ai_insights_not_found(client, db_session):
+    create_user(
+        db=db_session,
+        github_id=66666,
+        username="aitester",
+        name="AI Tester",
+        avatar_url="https://avatar.url",
+        access_token="ai_token",
+    )
     response = client.get("/repositories/999999/ai-insights")
     assert response.status_code == 404
     assert response.json()["detail"] == "Repository not found"

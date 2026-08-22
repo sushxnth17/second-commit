@@ -43,6 +43,17 @@ def fixture_client(db_session):
         finally:
             pass
 
+    def override_get_current_user():
+        # Query the first user created in the test db session
+        from app.models.user import User
+        user = db_session.query(User).first()
+        if not user:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        return user
+
+    from app.core.dependencies import get_current_user
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
     yield TestClient(app)
     app.dependency_overrides.clear()

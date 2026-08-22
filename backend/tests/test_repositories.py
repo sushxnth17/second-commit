@@ -82,7 +82,7 @@ def test_get_repositories_endpoint(client, db_session):
     )
 
     # 3. Call the API endpoint
-    response = client.get(f"/repositories/{user.github_id}")
+    response = client.get("/repositories")
 
     # 4. Assert responses
     assert response.status_code == 200
@@ -122,11 +122,11 @@ def test_get_repositories_endpoint(client, db_session):
     assert repo_data["html_url"] == "https://github.com/endpointuser/repo-alpha"
 
 
-def test_get_repositories_endpoint_user_not_found(client):
-    # Call the API with a non-existent github_id
-    response = client.get("/repositories/9999999")
-    assert response.status_code == 404
-    assert response.json()["detail"] == "User not found"
+def test_get_repositories_endpoint_unauthenticated(client):
+    # Call the API without a user (unauthenticated)
+    response = client.get("/repositories")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
 
 
 def test_sync_repository_success(client, db_session, mocker):
@@ -205,7 +205,15 @@ def test_sync_repository_success(client, db_session, mocker):
     assert db_repo.stars == 42
 
 
-def test_sync_repository_not_found(client):
+def test_sync_repository_not_found(client, db_session):
+    create_user(
+        db=db_session,
+        github_id=98765,
+        username="syncuser",
+        name="Sync User",
+        avatar_url="https://avatar.url",
+        access_token="sync_token",
+    )
     response = client.post("/repositories/99999/sync")
     assert response.status_code == 404
     assert response.json()["detail"] == "Repository not found"
@@ -309,7 +317,66 @@ def test_get_repository_by_id_success(client, db_session):
     assert data["size"] == 500
 
 
-def test_get_repository_by_id_not_found(client):
+def test_get_repository_by_id_not_found(client, db_session):
+    # Create user so we are authenticated
+    create_user(
+        db=db_session,
+        github_id=123456,
+        username="detailuser",
+        name="Detail User",
+        avatar_url="https://avatar.url",
+        access_token="detail_token",
+    )
     response = client.get("/repositories/999999")
     assert response.status_code == 404
+
+
+def test_get_repository_by_id_unauthenticated(client):
+    response = client.get("/repositories/777")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+
+
+def test_get_repository_by_id_other_user(client, db_session):
+    # 1. Create User A (who will be authenticated as the first user)
+    user_a = create_user(
+        db=db_session,
+        github_id=11111,
+        username="usera",
+        name="User A",
+        avatar_url="https://avatar.url",
+        access_token="token_a",
+    )
+
+    # 2. Create User B
+    user_b = create_user(
+        db=db_session,
+        github_id=22222,
+        username="userb",
+        name="User B",
+        avatar_url="https://avatar.url",
+        access_token="token_b",
+    )
+
+    # 3. Create repository belonging to User B
+    repo_b = create_repository(
+        db=db_session,
+        owner_id=user_b.id,
+        repo={
+            "id": 999,
+            "name": "repo-b",
+            "full_name": "userb/repo-b",
+            "description": "User B repository",
+            "html_url": "https://github.com/userb/repo-b",
+            "language": "Python",
+            "default_branch": "main",
+        },
+    )
+
+    # 4. Request User B's repository as User A
+    response = client.get(f"/repositories/{repo_b.id}")
+    
+    # 5. Assert HTTP 404 (ownership check failure returns 404)
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Repository not found"
 

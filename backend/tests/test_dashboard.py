@@ -29,7 +29,7 @@ def test_get_dashboard_success(client, db_session):
     )
 
     # 3. Call the API endpoint
-    response = client.get(f"/dashboard/{user.github_id}")
+    response = client.get("/dashboard")
 
     # 4. Assert responses
     assert response.status_code == 200
@@ -63,8 +63,8 @@ def test_get_dashboard_success(client, db_session):
     assert data["total_repositories"] == 1
 
 
-def test_get_dashboard_user_not_found(client):
-    # Call the API with a non-existent github_id
-    response = client.get("/dashboard/9999999")
-    assert response.status_code == 404
-    assert response.json()["detail"] == "User not found"
+def test_get_dashboard_unauthenticated(client):
+    # Call the API without setting up a user (unauthenticated)
+    response = client.get("/dashboard")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"

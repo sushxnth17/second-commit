@@ -83,7 +83,7 @@ def test_get_developer_analytics_success(client, db_session):
     )
 
     # 3. Call endpoint
-    response = client.get(f"/analytics/{user.github_id}")
+    response = client.get("/analytics")
     assert response.status_code == 200
 
     data = response.json()
@@ -99,7 +99,7 @@ def test_get_developer_analytics_success(client, db_session):
     assert "average_health_score" in data
 
 
-def test_get_developer_analytics_not_found(client):
-    response = client.get("/analytics/999999")
-    assert response.status_code == 404
-    assert response.json()["detail"] == "User not found"
+def test_get_developer_analytics_unauthenticated(client):
+    response = client.get("/analytics")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"

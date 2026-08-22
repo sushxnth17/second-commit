@@ -121,7 +121,15 @@ def test_get_repository_dormancy_endpoint(client, db_session):
     assert "actively maintained" in data["message"]
 
 
-def test_get_repository_dormancy_not_found(client):
+def test_get_repository_dormancy_not_found(client, db_session):
+    create_user(
+        db=db_session,
+        github_id=55555,
+        username="dormancyuser",
+        name="Dormancy User",
+        avatar_url="https://avatar.url",
+        access_token="dormancy_token",
+    )
     response = client.get("/repositories/999999/dormancy")
     assert response.status_code == 404
     assert response.json()["detail"] == "Repository not found"

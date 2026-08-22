@@ -58,6 +58,8 @@ async def github_callback(
         )
         print("Updated access token:", user.access_token)
 
+    request.session["user_id"] = user.id
+
     return {
         "message": "Login successful",
         "user": {
@@ -66,7 +68,5 @@ async def github_callback(
             "username": user.username,
             "name": user.name,
             "avatar_url": user.avatar_url,
-            # Remove this in production
-            "access_token": user.access_token,
         },
     }
