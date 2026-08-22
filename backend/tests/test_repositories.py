@@ -337,8 +337,8 @@ def test_get_repository_by_id_unauthenticated(client):
     assert response.json()["detail"] == "Not authenticated"
 
 
-def test_get_repository_by_id_other_user(client, db_session):
-    # 1. Create User A (who will be authenticated as the first user)
+def test_get_repository_by_id_other_user(client, db_session, auth_context):
+    # 1. Create User A
     user_a = create_user(
         db=db_session,
         github_id=11111,
@@ -357,6 +357,9 @@ def test_get_repository_by_id_other_user(client, db_session):
         avatar_url="https://avatar.url",
         access_token="token_b",
     )
+
+    # Explicitly authenticate as User A
+    auth_context.user = user_a
 
     # 3. Create repository belonging to User B
     repo_b = create_repository(
@@ -379,4 +382,51 @@ def test_get_repository_by_id_other_user(client, db_session):
     # 5. Assert HTTP 404 (ownership check failure returns 404)
     assert response.status_code == 404
     assert response.json()["detail"] == "Repository not found"
+
+
+def test_service_create_repository(db_session, test_user):
+    from app.services.repository_service import create_repository
+    repo_data = {
+        "id": 999,
+        "name": "new-repo",
+        "full_name": "testuser/new-repo",
+        "description": "New repository",
+        "html_url": "https://github.com/testuser/new-repo",
+        "language": "Python",
+        "default_branch": "main",
+    }
+    repo = create_repository(db_session, test_user.id, repo_data)
+    assert repo.id is not None
+    assert repo.github_repo_id == 999
+    assert repo.name == "new-repo"
+    assert repo.owner_id == test_user.id
+
+
+def test_service_get_repository_by_github_id(db_session, test_repo):
+    from app.services.repository_service import get_repository_by_github_id
+    fetched = get_repository_by_github_id(db_session, test_repo.github_repo_id)
+    assert fetched is not None
+    assert fetched.id == test_repo.id
+
+
+def test_service_get_repositories_by_owner(db_session, test_user, test_repo):
+    from app.services.repository_service import get_repositories_by_owner
+    fetched = get_repositories_by_owner(db_session, test_user.id)
+    assert len(fetched) == 1
+    assert fetched[0].id == test_repo.id
+
+
+def test_service_get_repository_by_id(db_session, test_repo):
+    from app.services.repository_service import get_repository_by_id
+    fetched = get_repository_by_id(db_session, test_repo.id)
+    assert fetched is not None
+    assert fetched.id == test_repo.id
+
+
+def test_service_get_repository_by_id_missing(db_session):
+    import pytest
+    from app.services.repository_service import get_repository_by_id
+    with pytest.raises(ValueError) as exc_info:
+        get_repository_by_id(db_session, 99999)
+    assert str(exc_info.value) == "Repository not found"
 
