@@ -708,7 +708,7 @@ The project license will be finalized before the first public release.
 
 ---
 
-## 👨‍💻 Author
+##  Author
 
 **Sushanth S**
 
