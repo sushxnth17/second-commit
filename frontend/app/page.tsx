@@ -183,63 +183,65 @@ export default function Home() {
             </div>
 
             {analytics ? (
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Language & Popularity */}
-                <div className="rounded-lg border border-zinc-900 bg-zinc-950/30 p-6">
-                  <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-6">Language & Popularity</h3>
-                  
-                  <div className="divide-y divide-zinc-900">
-                    <div className="flex items-center justify-between py-3">
-                      <span className="text-xs text-zinc-400">Primary Language</span>
-                      <span className="rounded-md bg-zinc-900 border border-zinc-800 px-2 py-0.5 text-xs font-semibold text-zinc-300">
-                        {analytics.primary_language || "None detected"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between py-3">
-                      <span className="text-xs text-zinc-400">Most Popular Repository</span>
-                      <span className="text-xs font-medium text-white truncate max-w-[200px]">
-                        {analytics.most_popular_repository || "N/A"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between py-3">
-                      <span className="text-xs text-zinc-400">Most Active Repository</span>
-                      <span className="text-xs font-medium text-white truncate max-w-[200px]">
-                        {analytics.most_active_repository || "N/A"}
-                      </span>
+              <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-6">
+                <div className="grid gap-8 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-zinc-900">
+                  {/* Language & Popularity */}
+                  <div className="pr-0 md:pr-6">
+                    <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-4">Language & Popularity</h3>
+                    
+                    <div className="divide-y divide-zinc-900/60">
+                      <div className="flex items-center justify-between py-2.5">
+                        <span className="text-xs text-zinc-400">Primary Language</span>
+                        <span className="rounded bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
+                          {analytics.primary_language || "None detected"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-2.5">
+                        <span className="text-xs text-zinc-400">Most Popular Repository</span>
+                        <span className="text-xs font-semibold text-white truncate max-w-[200px]">
+                          {analytics.most_popular_repository || "N/A"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-2.5">
+                        <span className="text-xs text-zinc-400">Most Active Repository</span>
+                        <span className="text-xs font-semibold text-white truncate max-w-[200px]">
+                          {analytics.most_active_repository || "N/A"}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Maintenance Index */}
-                <div className="rounded-lg border border-zinc-900 bg-zinc-950/30 p-6">
-                  <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-6">Maintenance Metrics</h3>
-                  
-                  <div className="divide-y divide-zinc-900">
-                    <div className="flex items-center justify-between py-3">
-                      <span className="text-xs text-zinc-400">Active Repositories</span>
-                      <span className="text-xs font-mono text-emerald-400">
-                        {analytics.active_repositories}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between py-3">
-                      <span className="text-xs text-zinc-400">Dormant Repositories</span>
-                      <span className="text-xs font-mono text-rose-400">
-                        {analytics.dormant_repositories}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between py-3">
-                      <span className="text-xs text-zinc-400">Average Health Score</span>
-                      <span className="text-xs font-mono text-white">
-                        {analytics.average_health_score !== null && analytics.average_health_score !== undefined
-                          ? `${Math.round(analytics.average_health_score)}/100`
-                          : "N/A"}
-                      </span>
+                  {/* Maintenance Index */}
+                  <div className="pt-6 md:pt-0 pl-0 md:pl-8">
+                    <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-4">Maintenance Metrics</h3>
+                    
+                    <div className="divide-y divide-zinc-900/60">
+                      <div className="flex items-center justify-between py-2.5">
+                        <span className="text-xs text-zinc-400">Active Repositories</span>
+                        <span className="text-xs font-mono text-emerald-400 tracking-tight">
+                          {analytics.active_repositories}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-2.5">
+                        <span className="text-xs text-zinc-400">Dormant Repositories</span>
+                        <span className="text-xs font-mono text-rose-400 tracking-tight">
+                          {analytics.dormant_repositories}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-2.5">
+                        <span className="text-xs text-zinc-400">Average Health Score</span>
+                        <span className="text-xs font-mono text-white tracking-tight">
+                          {analytics.average_health_score !== null && analytics.average_health_score !== undefined
+                            ? `${Math.round(analytics.average_health_score)}/100`
+                            : "N/A"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-zinc-900 bg-zinc-950/50 p-12 text-center">
+              <div className="rounded-md border border-zinc-900 bg-zinc-950/20 p-12 text-center">
                 <p className="text-xs text-zinc-500">Analytics data is not loaded yet.</p>
               </div>
             )}

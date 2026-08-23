@@ -22,35 +22,35 @@ export default function Navbar({
     <nav className="sticky top-0 z-50 w-full border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md transition-colors">
       <div className="mx-auto max-w-5xl px-6">
         <div className="flex h-14 items-center justify-between">
-          <div className="flex items-center gap-6">
+          <div className="flex h-full items-center gap-6">
             {/* Logo */}
             <div className="flex items-center cursor-pointer" onClick={() => setActiveTab("dashboard")}>
-              <div className="flex h-7 w-7 items-center justify-center rounded border border-zinc-800 bg-zinc-900 text-indigo-400">
-                <span className="font-sans text-xs font-black tracking-wider">2C</span>
+              <div className="flex h-6 w-6 items-center justify-center rounded border border-zinc-800 bg-zinc-900 text-indigo-400">
+                <span className="font-sans text-[10px] font-black tracking-wider">2C</span>
               </div>
-              <span className="text-sm font-bold tracking-tight text-white ml-2.5">
+              <span className="text-xs font-semibold tracking-tight text-white ml-2">
                 SecondCommit
               </span>
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-1">
+            <div className="flex h-full items-center gap-4 ml-2">
               <button
                 onClick={() => setActiveTab("dashboard")}
-                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`flex items-center h-full text-xs font-medium transition-colors border-b-2 px-0.5 cursor-pointer outline-none focus-visible:text-white ${
                   activeTab === "dashboard"
-                    ? "bg-zinc-900 text-white border border-zinc-800"
-                    : "text-zinc-500 hover:text-zinc-300"
+                    ? "border-indigo-500 text-white"
+                    : "border-transparent text-zinc-500 hover:text-zinc-300"
                 }`}
               >
                 Dashboard
               </button>
               <button
                 onClick={() => setActiveTab("analytics")}
-                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`flex items-center h-full text-xs font-medium transition-colors border-b-2 px-0.5 cursor-pointer outline-none focus-visible:text-white ${
                   activeTab === "analytics"
-                    ? "bg-zinc-900 text-white border border-zinc-800"
-                    : "text-zinc-500 hover:text-zinc-300"
+                    ? "border-indigo-500 text-white"
+                    : "border-transparent text-zinc-500 hover:text-zinc-300"
                 }`}
               >
                 Analytics

@@ -110,7 +110,7 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="rounded border border-zinc-900 p-1.5 text-zinc-500 hover:bg-zinc-900 hover:text-white transition-colors"
+            className="rounded border border-zinc-900 p-1.5 text-zinc-500 hover:bg-zinc-900 hover:text-white transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -125,7 +125,7 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
         <button
           onClick={handleSync}
           disabled={syncing}
-          className={`flex items-center justify-center gap-2 rounded border border-zinc-800 bg-zinc-900/30 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-900 hover:border-zinc-700 transition-colors cursor-pointer ${
+          className={`flex items-center justify-center gap-2 rounded border border-zinc-800 bg-zinc-900/30 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-900 hover:border-zinc-700 transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
             syncing ? "cursor-not-allowed text-zinc-500" : ""
           }`}
         >
@@ -169,13 +169,13 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
       <div className="grid gap-6 md:grid-cols-3 mb-8">
         {/* Health score gauge */}
         {health && (
-          <div className="rounded-lg border border-zinc-900 bg-zinc-950/20 p-5 flex flex-col justify-between">
+          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between">
             <div>
-              <span className="text-[10px] font-bold text-zinc-550 uppercase tracking-wider">Health Rating</span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Health Rating</span>
               <div className="mt-3 flex items-center justify-between">
                 <div>
                   <p className="text-2xl font-bold text-white font-mono">{health.health_score}/100</p>
-                  <p className="text-[10px] text-zinc-500 mt-1">Grade: <span className="font-semibold text-zinc-300">{health.grade}</span></p>
+                  <p className="text-[10px] text-zinc-500 mt-1">Grade: <span className="font-semibold text-zinc-350 font-mono">{health.grade}</span></p>
                 </div>
                 <div className={`h-10 w-10 rounded border flex items-center justify-center text-sm font-black ${getScoreColor(health.health_score)}`}>
                   {health.grade}
@@ -183,7 +183,7 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
               </div>
             </div>
             <div className="mt-5 pt-3 border-t border-zinc-900/60">
-              <h4 className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Health Summary</h4>
+              <h4 className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Health Summary</h4>
               <p className="text-xs text-zinc-500 leading-relaxed">{health.summary}</p>
             </div>
           </div>
@@ -191,9 +191,9 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
 
         {/* Dormancy Maintenance status */}
         {dormancy && (
-          <div className="rounded-lg border border-zinc-900 bg-zinc-950/20 p-5 flex flex-col justify-between">
+          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between">
             <div>
-              <span className="text-[10px] font-bold text-zinc-550 uppercase tracking-wider">Activity Status</span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Activity Status</span>
               <div className="mt-3 flex items-center justify-between">
                 <div>
                   <p className="text-2xl font-bold text-white font-mono">
@@ -207,7 +207,7 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
               </div>
             </div>
             <div className="mt-5 pt-3 border-t border-zinc-900/60">
-              <h4 className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Maintenance Summary</h4>
+              <h4 className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Maintenance Summary</h4>
               <p className="text-xs text-zinc-500 leading-relaxed">{dormancy.message}</p>
             </div>
           </div>
@@ -215,19 +215,19 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
 
         {/* Developer complexity & AI score */}
         {aiInsights && (
-          <div className="rounded-lg border border-zinc-900 bg-zinc-950/20 p-5 flex flex-col justify-between">
+          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between">
             <div>
-              <span className="text-[10px] font-bold text-zinc-550 uppercase tracking-wider">AI Quality Score</span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">AI Quality Score</span>
               <div className="mt-3 flex items-center justify-between">
                 <div>
                   <p className="text-2xl font-bold text-white font-mono">{aiInsights.ai_score}/100</p>
-                  <p className="text-[10px] text-zinc-500 mt-1">Complexity: <span className="font-semibold text-zinc-300">{aiInsights.complexity}</span></p>
+                  <p className="text-[10px] text-zinc-500 mt-1">Complexity: <span className="font-semibold text-zinc-350">{aiInsights.complexity}</span></p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className={`rounded px-2.5 py-1 text-[10px] font-semibold border ${
                     aiInsights.beginner_friendly
-                      ? "text-emerald-400 border-emerald-900/50 bg-emerald-950/20"
-                      : "text-amber-400 border-amber-900/50 bg-amber-950/20"
+                      ? "text-emerald-400 border-emerald-955 bg-emerald-955/20"
+                      : "text-amber-400 border-amber-955 bg-amber-955/20"
                   }`}>
                     {aiInsights.beginner_friendly ? "Easy Intro" : "Complex"}
                   </span>
@@ -235,7 +235,7 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
               </div>
             </div>
             <div className="mt-5 pt-3 border-t border-zinc-900/60">
-              <h4 className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-1">AI Recommendation</h4>
+              <h4 className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">AI Recommendation</h4>
               <p className="text-xs text-zinc-500 leading-relaxed truncate">{aiInsights.summary}</p>
             </div>
           </div>
@@ -244,15 +244,15 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
 
       {/* AI Detailed Insights */}
       {aiInsights && (
-        <div className="rounded-lg border border-zinc-900 bg-zinc-950/20 p-6">
+        <div className="rounded-md border border-zinc-900 bg-zinc-950/20 p-6">
           <div className="mb-6 border-b border-zinc-900/60 pb-4">
             <h2 className="text-xs font-semibold uppercase text-zinc-400 tracking-wider">AI Repository Deep Dive</h2>
             <p className="text-[10px] text-zinc-550 mt-0.5">Machine learning analysis and structural recommendations.</p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-zinc-900">
             {/* Strengths */}
-            <div className="rounded-lg border border-zinc-900 bg-zinc-950/50 p-4">
+            <div className="pr-0 md:pr-4">
               <h3 className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 uppercase tracking-wide mb-3">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                 Core Strengths
@@ -268,9 +268,9 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
             </div>
 
             {/* Weaknesses */}
-            <div className="rounded-lg border border-zinc-900 bg-zinc-950/50 p-4">
-              <h3 className="flex items-center gap-1.5 text-xs font-bold text-rose-400 uppercase tracking-wide mb-3">
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+            <div className="pt-6 md:pt-0 pl-0 md:pl-8 pr-0 md:pr-4">
+              <h3 className="flex items-center gap-1.5 text-xs font-bold text-rose-450 uppercase tracking-wide mb-3">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-450" />
                 Weaknesses
               </h3>
               <ul className="space-y-2">
@@ -284,7 +284,7 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
             </div>
 
             {/* Suggestions */}
-            <div className="rounded-lg border border-zinc-900 bg-zinc-950/50 p-4">
+            <div className="pt-6 md:pt-0 pl-0 md:pl-8">
               <h3 className="flex items-center gap-1.5 text-xs font-bold text-indigo-400 uppercase tracking-wide mb-3">
                 <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
                 Action Items
