@@ -1,6 +1,29 @@
 import json
 from sqlalchemy.orm import Session
+
+# Patch groq._base_client to be compatible with httpx >= 0.28.0
+import groq._base_client
+
+original_sync_init = groq._base_client.SyncHttpxClientWrapper.__init__
+def patched_sync_init(self, *args, **kwargs):
+    if "proxies" in kwargs:
+        proxies = kwargs.pop("proxies")
+        if proxies is not None and "proxy" not in kwargs:
+            kwargs["proxy"] = proxies
+    original_sync_init(self, *args, **kwargs)
+groq._base_client.SyncHttpxClientWrapper.__init__ = patched_sync_init
+
+original_async_init = groq._base_client.AsyncHttpxClientWrapper.__init__
+def patched_async_init(self, *args, **kwargs):
+    if "proxies" in kwargs:
+        proxies = kwargs.pop("proxies")
+        if proxies is not None and "proxy" not in kwargs:
+            kwargs["proxy"] = proxies
+    original_async_init(self, *args, **kwargs)
+groq._base_client.AsyncHttpxClientWrapper.__init__ = patched_async_init
+
 from groq import Groq
+
 
 from app.core.config import settings
 from app.schemas.ai import AIInsightsResponse
@@ -63,11 +86,29 @@ def get_ai_insights(db: Session, repository_id: int) -> AIInsightsResponse:
                 {"role": "user", "content": prompt},
             ],
             model=settings.groq_model,
-            response_format={"type": "json_object"},
+            max_tokens=4096,
         )
 
         content = chat_completion.choices[0].message.content
-        data = json.loads(content)
+        
+        # Robustly extract JSON from model's response (handles thinking tags and code blocks)
+        cleaned_content = content
+        if "<think>" in cleaned_content and "</think>" in cleaned_content:
+            cleaned_content = cleaned_content.split("</think>")[-1]
+        cleaned_content = cleaned_content.strip()
+        if cleaned_content.startswith("```"):
+            lines = cleaned_content.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines[-1].startswith("```"):
+                lines = lines[:-1]
+            cleaned_content = "\n".join(lines).strip()
+        start = cleaned_content.find("{")
+        end = cleaned_content.rfind("}")
+        if start != -1 and end != -1:
+            cleaned_content = cleaned_content[start:end+1]
+            
+        data = json.loads(cleaned_content)
 
         return AIInsightsResponse(
             repository_name=data.get("repository_name", repository.name),

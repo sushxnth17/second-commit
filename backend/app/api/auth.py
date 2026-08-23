@@ -60,13 +60,5 @@ async def github_callback(
 
     request.session["user_id"] = user.id
 
-    return {
-        "message": "Login successful",
-        "user": {
-            "id": user.id,
-            "github_id": user.github_id,
-            "username": user.username,
-            "name": user.name,
-            "avatar_url": user.avatar_url,
-        },
-    }
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="http://localhost:3000/dashboard")
