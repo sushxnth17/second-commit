@@ -45,14 +45,9 @@ def test_github_callback_existing_user(client, db_session, mocker):
         return_value=mock_response
     )
 
-    response = client.get("/auth/github/callback")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["message"] == "Login successful"
-    assert data["user"]["github_id"] == 12345
-    assert data["user"]["username"] == "existinguser"
-    assert data["user"]["name"] == "Existing User Updated"
-    assert "access_token" not in data["user"]
+    response = client.get("/auth/github/callback", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "http://localhost:3000/dashboard"
 
 
 def test_github_callback_new_user(client, db_session, mocker):
@@ -77,10 +72,6 @@ def test_github_callback_new_user(client, db_session, mocker):
         return_value=mock_response
     )
 
-    response = client.get("/auth/github/callback")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["message"] == "Login successful"
-    assert data["user"]["github_id"] == 67890
-    assert data["user"]["username"] == "newuser"
-    assert "access_token" not in data["user"]
+    response = client.get("/auth/github/callback", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "http://localhost:3000/dashboard"

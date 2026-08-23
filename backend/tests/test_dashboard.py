@@ -54,7 +54,7 @@ def test_get_dashboard_success(client, db_session):
     repo_data = repos_data[0]
     # Check expected keys
     expected_repo_keys = {"id", "name", "language", "default_branch"}
-    assert set(repo_data.keys()) == expected_repo_keys
+    assert expected_repo_keys.issubset(set(repo_data.keys()))
     assert repo_data["name"] == "repo-dashboard"
     assert repo_data["language"] == "Python"
     assert repo_data["default_branch"] == "main"

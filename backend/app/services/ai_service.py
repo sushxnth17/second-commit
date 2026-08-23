@@ -86,6 +86,7 @@ def get_ai_insights(db: Session, repository_id: int) -> AIInsightsResponse:
                 {"role": "user", "content": prompt},
             ],
             model=settings.groq_model,
+            max_tokens=4096,
         )
 
         content = chat_completion.choices[0].message.content
