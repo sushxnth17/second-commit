@@ -24,20 +24,24 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const fetchData = async () => {
     setLoading(true);
     setError(null);
+    setAIInsights(null);
+    setAiLoading(false);
+    setAiError(null);
     try {
-      const [r, h, d, ai] = await Promise.all([
+      const [r, h, d] = await Promise.all([
         api.getRepository(repoId),
         api.getRepositoryHealth(repoId),
         api.getRepositoryDormancy(repoId),
-        api.getRepositoryAIInsights(repoId),
       ]);
       setRepo(r);
       setHealth(h);
       setDormancy(d);
-      setAIInsights(ai);
     } catch (err: any) {
       setError(err.message || "Failed to fetch repository details.");
     } finally {
@@ -49,12 +53,27 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
     fetchData();
   }, [repoId]);
 
+  const handleGenerateAI = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const ai = await api.getRepositoryAIInsights(repoId);
+      setAIInsights(ai);
+    } catch (err: any) {
+      setAiError(err.message || "Failed to generate AI insights.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleSync = async () => {
     if (!repo) return;
     setSyncing(true);
     setError(null);
     try {
       await api.syncRepository(repo.id);
+      setAIInsights(null);
+      setAiError(null);
       // Re-fetch everything after sync
       await fetchData();
       onSyncSuccess();
@@ -213,7 +232,7 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
           </div>
         )}
 
-        {/* Developer complexity & AI score */}
+        {/* Developer complexity & AI score / Empty State / Loading State / Error State */}
         {aiInsights && (
           <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between">
             <div>
@@ -238,6 +257,48 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
               <h4 className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">AI Recommendation</h4>
               <p className="text-xs text-zinc-500 leading-relaxed truncate">{aiInsights.summary}</p>
             </div>
+          </div>
+        )}
+
+        {!aiInsights && !aiLoading && !aiError && (
+          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between min-h-[180px]">
+            <div>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">AI Repository Analysis</span>
+              <p className="mt-2 text-xs text-zinc-500 leading-normal">
+                Generate an AI-powered analysis of this repository, including strengths, weaknesses, and actionable recommendations.
+              </p>
+            </div>
+            <button
+              onClick={handleGenerateAI}
+              className="mt-4 w-full rounded border border-zinc-850 bg-zinc-900/50 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-905 hover:border-zinc-700 transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+            >
+              Generate AI Analysis
+            </button>
+          </div>
+        )}
+
+        {aiLoading && (
+          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-center items-center min-h-[180px] text-center">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent mb-3" />
+            <span className="text-xs font-semibold text-zinc-350">Analyzing codebase...</span>
+            <span className="text-[9px] text-zinc-550 mt-1">Requesting LLM analysis of repository stats</span>
+          </div>
+        )}
+
+        {aiError && (
+          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between min-h-[180px]">
+            <div>
+              <span className="text-[10px] font-bold text-rose-450 uppercase tracking-wider">AI Analysis Failed</span>
+              <p className="mt-2 text-xs text-rose-450/80 leading-normal line-clamp-3">
+                {aiError}
+              </p>
+            </div>
+            <button
+              onClick={handleGenerateAI}
+              className="mt-4 w-full rounded border border-red-900 bg-red-950/30 px-3.5 py-1.5 text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-950/50 hover:border-red-800 transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+            >
+              Retry AI Analysis
+            </button>
           </div>
         )}
       </div>
