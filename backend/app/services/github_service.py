@@ -7,15 +7,27 @@ async def get_user_repositories(access_token: str):
         "Accept": "application/vnd.github+json",
     }
 
+    repos = []
+    page = 1
+    per_page = 100
+
     async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://api.github.com/user/repos",
-            headers=headers,
-        )
+        while True:
+            response = await client.get(
+                "https://api.github.com/user/repos",
+                headers=headers,
+                params={"page": page, "per_page": per_page},
+            )
+            response.raise_for_status()
+            page_repos = response.json()
 
-    response.raise_for_status()
+            if not page_repos:
+                break
 
-    return response.json()
+            repos.extend(page_repos)
+            page += 1
+
+    return repos
 
 
 async def get_repository_details(access_token: str, full_name: str):
