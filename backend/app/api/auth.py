@@ -25,9 +25,6 @@ async def github_callback(
 ):
     token = await oauth.github.authorize_access_token(request)
     
-
-    print(token)
-    
     response = await oauth.github.get(
         "user",
         token=token
@@ -46,7 +43,6 @@ async def github_callback(
             avatar_url=profile.get("avatar_url"),
             access_token=token["access_token"],
         )
-        print("Saved access token:", user.access_token)
     else:
         user = update_user(
             db=db,
@@ -56,7 +52,6 @@ async def github_callback(
             avatar_url=profile.get("avatar_url"),
             access_token=token["access_token"],
         )
-        print("Updated access token:", user.access_token)
 
     request.session["user_id"] = user.id
 
