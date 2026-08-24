@@ -430,3 +430,114 @@ def test_service_get_repository_by_id_missing(db_session):
         get_repository_by_id(db_session, 99999)
     assert str(exc_info.value) == "Repository not found"
 
+
+def test_import_repository_new(client, db_session, test_user, mocker):
+    mock_repos = [
+        {
+            "id": 999,
+            "name": "new-repo",
+            "full_name": "testuser/new-repo",
+            "description": "A new repo",
+            "html_url": "https://github.com/testuser/new-repo",
+            "language": "Python",
+            "default_branch": "main",
+            "stargazers_count": 0,
+            "forks_count": 0,
+            "watchers_count": 0,
+            "open_issues_count": 0,
+            "size": 100,
+        }
+    ]
+    mocker.patch(
+        "app.api.repositories.get_user_repositories",
+        new_callable=mocker.AsyncMock,
+        return_value=mock_repos
+    )
+
+    response = client.post("/repositories/import/999")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["message"] == "Repository imported successfully"
+    assert data["repository"]["name"] == "new-repo"
+    assert data["repository"]["id"] is not None
+
+
+def test_import_repository_own_duplicate(client, db_session, test_user, mocker):
+    from app.services.repository_service import create_repository
+    repo_data = {
+        "id": 999,
+        "name": "new-repo",
+        "full_name": "testuser/new-repo",
+        "html_url": "https://github.com/testuser/new-repo",
+        "default_branch": "main",
+    }
+    db_repo = create_repository(db_session, test_user.id, repo_data)
+
+    mock_repos = [
+        {
+            "id": 999,
+            "name": "new-repo",
+            "full_name": "testuser/new-repo",
+            "html_url": "https://github.com/testuser/new-repo",
+            "default_branch": "main",
+        }
+    ]
+    mocker.patch(
+        "app.api.repositories.get_user_repositories",
+        new_callable=mocker.AsyncMock,
+        return_value=mock_repos
+    )
+
+    response = client.post("/repositories/import/999")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["message"] == "Repository already imported"
+    assert data["repository"]["id"] == db_repo.id
+    assert data["repository"]["name"] == "new-repo"
+
+
+def test_import_repository_other_user_duplicate(client, db_session, test_user, auth_context, mocker):
+    from app.services.user_service import create_user
+    user_b = create_user(
+        db=db_session,
+        github_id=22222,
+        username="userb",
+        name="User B",
+        avatar_url="https://avatar.url",
+        access_token="token_b",
+    )
+
+    from app.services.repository_service import create_repository
+    repo_data = {
+        "id": 999,
+        "name": "new-repo",
+        "full_name": "testuser/new-repo",
+        "html_url": "https://github.com/testuser/new-repo",
+        "default_branch": "main",
+    }
+    db_repo = create_repository(db_session, user_b.id, repo_data)
+
+    auth_context.user = test_user
+
+    mock_repos = [
+        {
+            "id": 999,
+            "name": "new-repo",
+            "full_name": "testuser/new-repo",
+            "html_url": "https://github.com/testuser/new-repo",
+            "default_branch": "main",
+        }
+    ]
+    mocker.patch(
+        "app.api.repositories.get_user_repositories",
+        new_callable=mocker.AsyncMock,
+        return_value=mock_repos
+    )
+
+    response = client.post("/repositories/import/999")
+    assert response.status_code == 400
+    data = response.json()
+    assert data["detail"] == "Repository is already associated with another account."
+    assert "repository" not in data or data.get("repository") is None
+
+

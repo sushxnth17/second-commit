@@ -54,13 +54,19 @@ async def import_repository(
     )
 
     if existing:
-        return {
-            "message": "Repository already imported",
-            "repository": {
-                "id": existing.id,
-                "name": existing.name,
-            },
-        }
+        if existing.owner_id == current_user.id:
+            return {
+                "message": "Repository already imported",
+                "repository": {
+                    "id": existing.id,
+                    "name": existing.name,
+                },
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Repository is already associated with another account.",
+            )
 
     repository = create_repository(
         db=db,
