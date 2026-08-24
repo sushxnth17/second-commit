@@ -41,7 +41,8 @@ class Repository(Base):
     pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     owner_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id")
+        ForeignKey("users.id"),
+        index=True
     )
 
     owner = relationship("User")
