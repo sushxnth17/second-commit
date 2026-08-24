@@ -541,3 +541,175 @@ def test_import_repository_other_user_duplicate(client, db_session, test_user, a
     assert "repository" not in data or data.get("repository") is None
 
 
+def test_sync_repository_other_user(client, db_session, auth_context, mocker):
+    from app.services.user_service import create_user
+    user_a = create_user(
+        db=db_session,
+        github_id=11111,
+        username="usera",
+        name="User A",
+        avatar_url="https://avatar.url",
+        access_token="token_a",
+    )
+    user_b = create_user(
+        db=db_session,
+        github_id=22222,
+        username="userb",
+        name="User B",
+        avatar_url="https://avatar.url",
+        access_token="token_b",
+    )
+
+    auth_context.user = user_a
+
+    from app.services.repository_service import create_repository
+    repo_b = create_repository(
+        db=db_session,
+        owner_id=user_b.id,
+        repo={
+            "id": 999,
+            "name": "repo-b",
+            "full_name": "userb/repo-b",
+            "html_url": "https://github.com/userb/repo-b",
+            "default_branch": "main",
+        },
+    )
+
+    mock_get_details = mocker.patch("app.api.repositories.get_repository_details")
+
+    response = client.post(f"/repositories/{repo_b.id}/sync")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Repository not found"
+    mock_get_details.assert_not_called()
+
+
+def test_health_repository_other_user(client, db_session, auth_context, mocker):
+    from app.services.user_service import create_user
+    user_a = create_user(
+        db=db_session,
+        github_id=11111,
+        username="usera",
+        name="User A",
+        avatar_url="https://avatar.url",
+        access_token="token_a",
+    )
+    user_b = create_user(
+        db=db_session,
+        github_id=22222,
+        username="userb",
+        name="User B",
+        avatar_url="https://avatar.url",
+        access_token="token_b",
+    )
+
+    auth_context.user = user_a
+
+    from app.services.repository_service import create_repository
+    repo_b = create_repository(
+        db=db_session,
+        owner_id=user_b.id,
+        repo={
+            "id": 999,
+            "name": "repo-b",
+            "full_name": "userb/repo-b",
+            "html_url": "https://github.com/userb/repo-b",
+            "default_branch": "main",
+        },
+    )
+
+    mock_get_health = mocker.patch("app.api.health.get_health")
+
+    response = client.get(f"/repositories/{repo_b.id}/health")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Repository not found"
+    mock_get_health.assert_not_called()
+
+
+def test_dormancy_repository_other_user(client, db_session, auth_context, mocker):
+    from app.services.user_service import create_user
+    user_a = create_user(
+        db=db_session,
+        github_id=11111,
+        username="usera",
+        name="User A",
+        avatar_url="https://avatar.url",
+        access_token="token_a",
+    )
+    user_b = create_user(
+        db=db_session,
+        github_id=22222,
+        username="userb",
+        name="User B",
+        avatar_url="https://avatar.url",
+        access_token="token_b",
+    )
+
+    auth_context.user = user_a
+
+    from app.services.repository_service import create_repository
+    repo_b = create_repository(
+        db=db_session,
+        owner_id=user_b.id,
+        repo={
+            "id": 999,
+            "name": "repo-b",
+            "full_name": "userb/repo-b",
+            "html_url": "https://github.com/userb/repo-b",
+            "default_branch": "main",
+        },
+    )
+
+    mock_get_dormancy = mocker.patch("app.api.dormancy.get_repository_dormancy")
+
+    response = client.get(f"/repositories/{repo_b.id}/dormancy")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Repository not found"
+    mock_get_dormancy.assert_not_called()
+
+
+def test_ai_insights_repository_other_user(client, db_session, auth_context, mocker):
+    from app.services.user_service import create_user
+    user_a = create_user(
+        db=db_session,
+        github_id=11111,
+        username="usera",
+        name="User A",
+        avatar_url="https://avatar.url",
+        access_token="token_a",
+    )
+    user_b = create_user(
+        db=db_session,
+        github_id=22222,
+        username="userb",
+        name="User B",
+        avatar_url="https://avatar.url",
+        access_token="token_b",
+    )
+
+    auth_context.user = user_a
+
+    from app.services.repository_service import create_repository
+    repo_b = create_repository(
+        db=db_session,
+        owner_id=user_b.id,
+        repo={
+            "id": 999,
+            "name": "repo-b",
+            "full_name": "userb/repo-b",
+            "html_url": "https://github.com/userb/repo-b",
+            "default_branch": "main",
+        },
+    )
+
+    mock_get_ai = mocker.patch("app.api.ai.get_ai_insights")
+
+    response = client.get(f"/repositories/{repo_b.id}/ai-insights")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Repository not found"
+    mock_get_ai.assert_not_called()
+
+
