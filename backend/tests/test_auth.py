@@ -75,3 +75,90 @@ def test_github_callback_new_user(client, db_session, mocker):
     response = client.get("/auth/github/callback", follow_redirects=False)
     assert response.status_code == 307
     assert response.headers["location"] == "http://localhost:3000/dashboard"
+
+
+def test_logout_clears_session_and_rejects_subsequent_requests(client, db_session, mocker):
+    from app.core.dependencies import get_current_user
+    from app.main import app
+
+    # Remove get_current_user dependency override so we test the real session verification
+    if get_current_user in app.dependency_overrides:
+        del app.dependency_overrides[get_current_user]
+
+    try:
+        # 1. Log in by mocking callback
+        mock_token = {"access_token": "test_logout_token"}
+        mock_profile = {
+            "id": 99999,
+            "login": "logoutuser",
+            "name": "Logout User",
+            "avatar_url": "https://avatar.url",
+        }
+        mocker.patch(
+            "app.core.github_oauth.oauth.github.authorize_access_token",
+            new_callable=AsyncMock,
+            return_value=mock_token
+        )
+        mock_response = MagicMock()
+        mock_response.json.return_value = mock_profile
+        mocker.patch(
+            "app.core.github_oauth.oauth.github.get",
+            new_callable=AsyncMock,
+            return_value=mock_response
+        )
+
+        login_res = client.get("/auth/github/callback", follow_redirects=False)
+        assert login_res.status_code == 307
+
+        # Verify authenticated request works now
+        auth_res = client.get("/repositories")
+        assert auth_res.status_code == 200
+
+        # 2. Call logout
+        logout_res = client.post("/auth/logout")
+        assert logout_res.status_code == 200
+        assert logout_res.json() == {"message": "Logged out successfully"}
+
+        # 3. Subsequent request should fail with 401
+        post_logout_res = client.get("/repositories")
+        assert post_logout_res.status_code == 401
+        assert post_logout_res.json()["detail"] == "Not authenticated"
+    finally:
+        pass
+
+
+def test_github_callback_profile_error(client, db_session, mocker):
+    mock_token = {"access_token": "secret_token_123"}
+    
+    mocker.patch(
+        "app.core.github_oauth.oauth.github.authorize_access_token",
+        new_callable=AsyncMock,
+        return_value=mock_token
+    )
+    
+    mock_response = MagicMock()
+    mock_response.status_code = 401
+    mock_response.json.return_value = {"error": "bad token"}
+    
+    import httpx
+    request = httpx.Request("GET", "https://api.github.com/user")
+    response_obj = httpx.Response(status_code=401, request=request, json={"error": "bad token"})
+    mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        message="Unauthorized",
+        request=request,
+        response=response_obj
+    )
+    
+    mocker.patch(
+        "app.core.github_oauth.oauth.github.get",
+        new_callable=AsyncMock,
+        return_value=mock_response
+    )
+
+    response = client.get("/auth/github/callback", follow_redirects=False)
+    
+    assert response.status_code == 400
+    data = response.json()
+    assert data["detail"] == "Failed to authenticate with GitHub. Please try again."
+    assert "secret_token_123" not in response.text
+

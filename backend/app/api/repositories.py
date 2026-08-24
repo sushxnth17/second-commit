@@ -54,13 +54,19 @@ async def import_repository(
     )
 
     if existing:
-        return {
-            "message": "Repository already imported",
-            "repository": {
-                "id": existing.id,
-                "name": existing.name,
-            },
-        }
+        if existing.owner_id == current_user.id:
+            return {
+                "message": "Repository already imported",
+                "repository": {
+                    "id": existing.id,
+                    "name": existing.name,
+                },
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Repository is already associated with another account.",
+            )
 
     repository = create_repository(
         db=db,
@@ -137,14 +143,36 @@ async def sync_repository(
     try:
         github_data = await get_repository_details(owner.access_token, repository.full_name)
     except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"GitHub API failure: {e.response.status_code} - {e.response.text}",
-        )
+        status_code = e.response.status_code
+        if status_code == 401:
+            raise HTTPException(
+                status_code=401,
+                detail="GitHub authentication token is invalid or has expired.",
+            )
+        elif status_code == 403:
+            raise HTTPException(
+                status_code=403,
+                detail="Access to the GitHub repository is forbidden (rate limit or permissions issue).",
+            )
+        elif status_code == 404:
+            raise HTTPException(
+                status_code=404,
+                detail="The GitHub repository was not found or is unavailable.",
+            )
+        elif status_code >= 500:
+            raise HTTPException(
+                status_code=502,
+                detail="GitHub service is temporarily unavailable. Please try again later.",
+            )
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to sync with GitHub (HTTP {status_code}).",
+            )
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=502,
-            detail=f"GitHub API connection failure: {str(e)}",
+            detail="Failed to connect to the GitHub API. Please check your network connection.",
         )
 
     updated_repository = update_repository(

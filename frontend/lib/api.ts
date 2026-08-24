@@ -1,0 +1,191 @@
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+export interface UserSummary {
+  github_id: number;
+  username: string;
+  name: string | null;
+  avatar_url?: string | null;
+}
+
+export interface RepositorySummary {
+  id: number;
+  name: string;
+  language: string | null;
+  default_branch: string;
+  stars?: number | null;
+  forks?: number | null;
+  open_issues?: number | null;
+  size?: number | null;
+  description?: string | null;
+  pushed_at?: string | null;
+  health_score?: number;
+  health_grade?: string;
+  dormancy_status?: string;
+}
+
+export interface RepositoryResponse {
+  id: number;
+  github_repo_id: number;
+  name: string;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  language: string | null;
+  default_branch: string;
+  stars: number | null;
+  forks: number | null;
+  watchers: number | null;
+  open_issues: number | null;
+  size: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  pushed_at: string | null;
+}
+
+export interface DashboardResponse {
+  user: UserSummary;
+  repositories: RepositorySummary[];
+  total_repositories: number;
+}
+
+export interface HealthResponse {
+  repository_id: number;
+  repository_name: string;
+  health_score: number;
+  grade: string;
+  summary: string;
+}
+
+export interface DormancyResponse {
+  repository_id: number;
+  repository_name: string;
+  days_since_last_push: number;
+  status: string;
+  message: string;
+}
+
+export interface AnalyticsResponse {
+  github_id: number;
+  username: string;
+  total_repositories: number;
+  total_stars: number;
+  total_forks: number;
+  active_repositories: number;
+  dormant_repositories: number;
+  primary_language: string | null;
+  most_popular_repository: string | null;
+  most_active_repository: string | null;
+  average_health_score: number | null;
+}
+
+export interface AIInsightsResponse {
+  repository_id: number;
+  repository_name: string;
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  suggestions: string[];
+  beginner_friendly: boolean;
+  complexity: string;
+  ai_score: number;
+}
+
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  language: string | null;
+  default_branch: string;
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const url = `${API_URL}${path}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.headers || {}),
+    },
+    credentials: "include", // Ensure session cookies are sent/received
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("UNAUTHORIZED");
+    }
+    const errText = await response.text();
+    let detail = "An error occurred";
+    try {
+      const parsed = JSON.parse(errText);
+      detail = parsed.detail || detail;
+    } catch {}
+    throw new Error(detail);
+  }
+
+  return response.json();
+}
+
+export const api = {
+  // Authentication url helper
+  getLoginUrl() {
+    return `${API_URL}/auth/github`;
+  },
+
+  // Logout helper
+  logout(): Promise<{ message: string }> {
+    return request<{ message: string }>("/auth/logout", {
+      method: "POST",
+    });
+  },
+
+  // Dashboard endpoint
+  getDashboard(): Promise<DashboardResponse> {
+    return request<DashboardResponse>("/dashboard");
+  },
+
+  // Developer analytics
+  getAnalytics(): Promise<AnalyticsResponse> {
+    return request<AnalyticsResponse>("/analytics");
+  },
+
+  // GitHub repositories (available to import)
+  getGitHubRepositories(): Promise<GitHubRepo[]> {
+    return request<GitHubRepo[]>("/github/repositories");
+  },
+
+  // Import repository
+  importRepository(repoId: number): Promise<{ message: string; repository: { id: number; name: string } }> {
+    return request(`/repositories/import/${repoId}`, {
+      method: "POST",
+    });
+  },
+
+  // Get specific repository
+  getRepository(id: number): Promise<RepositoryResponse> {
+    return request<RepositoryResponse>(`/repositories/${id}`);
+  },
+
+  // Sync repository
+  syncRepository(id: number): Promise<RepositoryResponse> {
+    return request<RepositoryResponse>(`/repositories/${id}/sync`, {
+      method: "POST",
+    });
+  },
+
+  // Repository Health
+  getRepositoryHealth(id: number): Promise<HealthResponse> {
+    return request<HealthResponse>(`/repositories/${id}/health`);
+  },
+
+  // Repository Dormancy
+  getRepositoryDormancy(id: number): Promise<DormancyResponse> {
+    return request<DormancyResponse>(`/repositories/${id}/dormancy`);
+  },
+
+  // AI Insights
+  getRepositoryAIInsights(id: number): Promise<AIInsightsResponse> {
+    return request<AIInsightsResponse>(`/repositories/${id}/ai-insights`);
+  },
+};

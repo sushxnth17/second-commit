@@ -22,7 +22,7 @@ def patched_async_init(self, *args, **kwargs):
     original_async_init(self, *args, **kwargs)
 groq._base_client.AsyncHttpxClientWrapper.__init__ = patched_async_init
 
-from groq import Groq
+from groq import AsyncGroq
 
 
 from app.core.config import settings
@@ -32,7 +32,7 @@ from app.services.health_service import calculate_health_score
 from app.services.dormancy_service import calculate_dormancy
 
 
-def get_ai_insights(db: Session, repository_id: int) -> AIInsightsResponse:
+async def get_ai_insights(db: Session, repository_id: int) -> AIInsightsResponse:
     # 1. Retrieve repository (raises ValueError if not found)
     repository = get_repository_by_id(db, repository_id)
 
@@ -62,7 +62,7 @@ def get_ai_insights(db: Session, repository_id: int) -> AIInsightsResponse:
     # 5. Send to Groq and parse response
     try:
         api_key = settings.groq_api_key
-        client = Groq(api_key=api_key)
+        client = AsyncGroq(api_key=api_key)
 
         system_prompt = (
             "You are a repository analysis assistant. Analyze the repository metadata and metrics and return insights. "
@@ -80,7 +80,7 @@ def get_ai_insights(db: Session, repository_id: int) -> AIInsightsResponse:
             "Respond ONLY with this JSON object."
         )
 
-        chat_completion = client.chat.completions.create(
+        chat_completion = await client.chat.completions.create(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},

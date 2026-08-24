@@ -63,12 +63,18 @@ export default function Home() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (err: any) {
+      console.error("Failed to log out from server:", err);
+    }
     // Clear local session state (session cookie is HttpOnly, so we clear UI state)
     setUser(null);
     setRepos([]);
     setAnalytics(null);
     setSelectedRepoId(null);
+    setActiveTab("dashboard");
   };
 
   if (loading) {
