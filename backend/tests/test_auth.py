@@ -126,3 +126,39 @@ def test_logout_clears_session_and_rejects_subsequent_requests(client, db_sessio
     finally:
         pass
 
+
+def test_github_callback_profile_error(client, db_session, mocker):
+    mock_token = {"access_token": "secret_token_123"}
+    
+    mocker.patch(
+        "app.core.github_oauth.oauth.github.authorize_access_token",
+        new_callable=AsyncMock,
+        return_value=mock_token
+    )
+    
+    mock_response = MagicMock()
+    mock_response.status_code = 401
+    mock_response.json.return_value = {"error": "bad token"}
+    
+    import httpx
+    request = httpx.Request("GET", "https://api.github.com/user")
+    response_obj = httpx.Response(status_code=401, request=request, json={"error": "bad token"})
+    mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        message="Unauthorized",
+        request=request,
+        response=response_obj
+    )
+    
+    mocker.patch(
+        "app.core.github_oauth.oauth.github.get",
+        new_callable=AsyncMock,
+        return_value=mock_response
+    )
+
+    response = client.get("/auth/github/callback", follow_redirects=False)
+    
+    assert response.status_code == 400
+    data = response.json()
+    assert data["detail"] == "Failed to authenticate with GitHub. Please try again."
+    assert "secret_token_123" not in response.text
+

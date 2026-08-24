@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.github_oauth import oauth
@@ -23,12 +23,19 @@ async def github_callback(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    token = await oauth.github.authorize_access_token(request)
-    
-    response = await oauth.github.get(
-        "user",
-        token=token
-    )
+    try:
+        token = await oauth.github.authorize_access_token(request)
+        
+        response = await oauth.github.get(
+            "user",
+            token=token
+        )
+        response.raise_for_status()
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to authenticate with GitHub. Please try again.",
+        )
 
     profile = response.json()
 

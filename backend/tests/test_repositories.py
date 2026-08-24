@@ -262,7 +262,7 @@ def test_sync_repository_github_failure(client, db_session, mocker):
 
     # 5. Assertions
     assert response.status_code == 502
-    assert "GitHub API failure" in response.json()["detail"]
+    assert "GitHub service is temporarily unavailable" in response.json()["detail"]
 
 
 def test_get_repository_by_id_success(client, db_session):
@@ -713,3 +713,39 @@ def test_ai_insights_repository_other_user(client, db_session, auth_context, moc
     mock_get_ai.assert_not_called()
 
 
+def test_sync_repository_error_sanitization(client, db_session, test_user, mocker):
+    from app.services.repository_service import create_repository
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 888,
+            "name": "my-repo",
+            "full_name": "testuser/my-repo",
+            "html_url": "https://github.com/testuser/my-repo",
+            "default_branch": "main",
+        },
+    )
+
+    import httpx
+    request = httpx.Request("GET", "https://api.github.com/repos/testuser/my-repo")
+    fake_body = "secret_token=SHOULD_NOT_LEAK"
+    response_obj = httpx.Response(status_code=502, request=request, text=fake_body)
+    
+    mocker.patch(
+        "app.api.repositories.get_repository_details",
+        new_callable=mocker.AsyncMock,
+        side_effect=httpx.HTTPStatusError(
+            message="Bad Gateway",
+            request=request,
+            response=response_obj
+        )
+    )
+
+    response = client.post(f"/repositories/{repo.id}/sync")
+
+    assert response.status_code == 502
+    data = response.json()
+    assert data["detail"] == "GitHub service is temporarily unavailable. Please try again later."
+    assert "secret_token" not in response.text
+    assert "SHOULD_NOT_LEAK" not in response.text
