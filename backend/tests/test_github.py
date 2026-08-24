@@ -107,3 +107,46 @@ async def test_get_user_repositories_multi_page(mocker):
         },
         params={"page": 3, "per_page": 100},
     )
+
+
+@pytest.mark.anyio
+async def test_github_service_timeout_configuration(mocker):
+    import httpx
+    spy_init = mocker.spy(httpx.AsyncClient, "__init__")
+
+    mock_resp = mocker.MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = []
+    mock_resp.raise_for_status = mocker.MagicMock()
+    mocker.patch("httpx.AsyncClient.get", mocker.AsyncMock(return_value=mock_resp))
+
+    await get_user_repositories("test_token")
+
+    called_kwargs = spy_init.call_args.kwargs
+    timeout_val = called_kwargs.get("timeout")
+    if isinstance(timeout_val, httpx.Timeout):
+        assert timeout_val.connect == 10.0
+    else:
+        assert timeout_val == 10.0
+
+
+@pytest.mark.anyio
+async def test_get_repository_details_timeout_configuration(mocker):
+    import httpx
+    from app.services.github_service import get_repository_details
+    spy_init = mocker.spy(httpx.AsyncClient, "__init__")
+
+    mock_resp = mocker.MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {}
+    mock_resp.raise_for_status = mocker.MagicMock()
+    mocker.patch("httpx.AsyncClient.get", mocker.AsyncMock(return_value=mock_resp))
+
+    await get_repository_details("test_token", "owner/repo")
+
+    called_kwargs = spy_init.call_args.kwargs
+    timeout_val = called_kwargs.get("timeout")
+    if isinstance(timeout_val, httpx.Timeout):
+        assert timeout_val.connect == 10.0
+    else:
+        assert timeout_val == 10.0

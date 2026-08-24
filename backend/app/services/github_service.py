@@ -11,7 +11,7 @@ async def get_user_repositories(access_token: str):
     page = 1
     per_page = 100
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         while True:
             response = await client.get(
                 "https://api.github.com/user/repos",
@@ -36,7 +36,7 @@ async def get_repository_details(access_token: str, full_name: str):
         "Accept": "application/vnd.github+json",
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.get(
             f"https://api.github.com/repos/{full_name}",
             headers=headers,
