@@ -62,3 +62,9 @@ async def github_callback(
 
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="http://localhost:3000/dashboard")
+
+
+@router.post("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return {"message": "Logged out successfully"}
