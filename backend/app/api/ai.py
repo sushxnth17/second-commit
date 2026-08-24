@@ -33,7 +33,7 @@ async def get_repository_ai_insights_endpoint(
         )
 
     try:
-        return get_ai_insights(db, repository_id)
+        return await get_ai_insights(db, repository_id)
     except ValueError as e:
         raise HTTPException(
             status_code=404,

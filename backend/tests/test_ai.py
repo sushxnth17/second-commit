@@ -19,12 +19,12 @@ def test_get_repository_ai_insights_success(client, db_session, mocker):
     )
 
     mock_completions = mocker.MagicMock()
-    mock_completions.create.return_value = mocker.MagicMock(choices=mock_choices)
+    mock_completions.create = mocker.AsyncMock(return_value=mocker.MagicMock(choices=mock_choices))
 
     mock_client = mocker.MagicMock()
     mock_client.chat.completions = mock_completions
 
-    mocker.patch("app.services.ai_service.Groq", return_value=mock_client)
+    mocker.patch("app.services.ai_service.AsyncGroq", return_value=mock_client)
 
     # 2. Create a test user and repository
     user = create_user(
@@ -77,7 +77,7 @@ def test_get_repository_ai_insights_not_found(client, db_session):
 
 def test_get_repository_ai_insights_provider_error(client, db_session, mocker):
     # Mock Groq to raise an exception
-    mocker.patch("app.services.ai_service.Groq", side_effect=Exception("Groq rate limit"))
+    mocker.patch("app.services.ai_service.AsyncGroq", side_effect=Exception("Groq rate limit"))
 
     user = create_user(
         db=db_session,
