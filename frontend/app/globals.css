@@ -1,20 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
-  --foreground: #f4f4f5;
+  --background: #FFFFFF;
+  --foreground: #0A1628;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "Plus Jakarta Sans", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Space Mono", var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
   --font-serif: var(--font-lora), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-outfit: "Outfit", var(--font-sans);
+
+  --color-surface-base: #FFFFFF;
+  --color-surface-secondary: #F7F5F2;
+  --color-border-muted: #E2DDD6;
+  --color-border-strong: #D0C9BE;
+  --color-text-primary: #0A1628;
+  --color-text-secondary: #3D4F66;
+  --color-text-muted: #7A8FA8;
+  --color-brand-accent: #E8792A;
+  --color-semantic-healthy: #0A6C4A;
+  --color-semantic-warning: #E8792A;
+  --color-semantic-critical: #B91C1C;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
