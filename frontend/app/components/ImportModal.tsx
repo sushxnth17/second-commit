@@ -51,10 +51,10 @@ export default function ImportModal({ onClose, onImportSuccess }: ImportModalPro
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="flex h-full max-h-[80vh] w-full max-w-xl flex-col rounded-none border border-zinc-900 bg-zinc-950 shadow-2xl transition-colors overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="flex h-full max-h-[80vh] w-full max-w-2xl flex-col rounded-none border border-zinc-900 bg-zinc-950 shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-900 p-5">
+        <div className="flex items-center justify-between border-b border-zinc-900 p-5 bg-zinc-950/60 select-none">
           <div>
             <h2 className="text-base font-serif text-white tracking-tight">Import Repositories</h2>
             <p className="mt-1 text-[10px] text-zinc-500 font-sans">
@@ -63,7 +63,7 @@ export default function ImportModal({ onClose, onImportSuccess }: ImportModalPro
           </div>
           <button
             onClick={onClose}
-            className="rounded-none border border-transparent hover:border-zinc-850 hover:bg-zinc-900/50 p-1.5 text-zinc-550 hover:text-white transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-zinc-650"
+            className="rounded-none border border-transparent hover:border-zinc-800 hover:bg-zinc-900/50 p-1.5 text-zinc-550 hover:text-white transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-zinc-600"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -91,7 +91,7 @@ export default function ImportModal({ onClose, onImportSuccess }: ImportModalPro
               placeholder="Search GitHub repositories..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-none border border-zinc-900 bg-zinc-950 py-2 pl-9 pr-4 text-xs text-white outline-none placeholder:text-zinc-600 transition-colors focus:border-zinc-700"
+              className="w-full rounded-none border border-zinc-900 hover:border-zinc-800 bg-zinc-950 py-2 pl-9 pr-4 text-xs text-zinc-450 outline-none placeholder:text-zinc-600 transition-colors focus:border-zinc-700"
             />
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -99,7 +99,7 @@ export default function ImportModal({ onClose, onImportSuccess }: ImportModalPro
               viewBox="0 0 24 24"
               strokeWidth={2}
               stroke="currentColor"
-              className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-600"
+              className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-650"
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
             </svg>
@@ -107,7 +107,7 @@ export default function ImportModal({ onClose, onImportSuccess }: ImportModalPro
 
           {/* Repos list */}
           {loading ? (
-            <div className="flex h-48 flex-col items-center justify-center gap-4">
+            <div className="flex h-48 flex-col items-center justify-center gap-4 select-none">
               <div className="flex items-center gap-1.5">
                 <div className="h-1 w-1 rounded-full bg-zinc-400 animate-pulse" />
                 <div className="h-1 w-1 rounded-full bg-zinc-400 animate-pulse [animation-delay:0.2s]" />
@@ -116,7 +116,7 @@ export default function ImportModal({ onClose, onImportSuccess }: ImportModalPro
               <span className="text-[10px] font-mono tracking-wider uppercase text-zinc-550">Loading repositories</span>
             </div>
           ) : filteredRepos.length === 0 ? (
-            <div className="flex h-48 flex-col items-center justify-center text-center">
+            <div className="flex h-48 flex-col items-center justify-center text-center select-none">
               <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">No repositories found</span>
               <span className="mt-1.5 text-[10px] text-zinc-600 font-mono">Try adjusting your search query.</span>
             </div>
@@ -129,23 +129,23 @@ export default function ImportModal({ onClose, onImportSuccess }: ImportModalPro
                 return (
                   <div
                     key={repo.id}
-                    className="flex items-center justify-between gap-4 rounded-none border border-zinc-900 bg-zinc-950/20 p-3 transition-colors hover:bg-zinc-900/10"
+                    className="flex items-center justify-between gap-4 rounded-none border border-zinc-900 bg-zinc-950/20 p-3.5 transition-colors hover:bg-zinc-900/10"
                   >
                     <div className="flex-1 min-w-0">
                       <h4 className="font-serif text-sm font-normal text-zinc-200 truncate">
                         {repo.name}
                       </h4>
-                      <p className="mt-1 text-[10px] text-zinc-500 line-clamp-1 leading-normal">
+                      <p className="mt-1 text-[10px] text-zinc-500 line-clamp-1 leading-normal font-sans">
                         {repo.description || "No description provided."}
                       </p>
                       <div className="mt-2 flex items-center gap-3">
                         {repo.language && (
-                          <span className="inline-flex items-center gap-1.5 text-[9px] text-zinc-450 font-mono">
+                          <span className="inline-flex items-center gap-1.5 text-[9px] text-zinc-450 font-mono select-none">
                             <span className="h-1 w-1 rounded-full bg-zinc-400" />
                             {repo.language}
                           </span>
                         )}
-                        <span className="text-[9px] text-zinc-550 font-mono">
+                        <span className="text-[9px] text-zinc-550 font-mono select-none">
                           default branch: {repo.default_branch}
                         </span>
                       </div>
@@ -154,12 +154,12 @@ export default function ImportModal({ onClose, onImportSuccess }: ImportModalPro
                     <button
                       onClick={() => handleImport(repo.id)}
                       disabled={isImported || isImporting}
-                      className={`rounded-none px-3.5 py-2 text-[10px] font-mono uppercase tracking-wider transition-all shrink-0 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-zinc-650 ${
+                      className={`rounded-none px-3.5 py-2 text-[10px] font-mono uppercase tracking-wider transition-all shrink-0 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-zinc-600 ${
                         isImported
-                          ? "bg-zinc-900 text-emerald-450 border border-zinc-850 cursor-default"
+                          ? "bg-zinc-900 text-emerald-400 border border-zinc-850 cursor-default"
                           : isImporting
                           ? "bg-zinc-950 text-zinc-600 border border-zinc-900 cursor-not-allowed animate-pulse"
-                          : "bg-white text-zinc-950 hover:bg-zinc-200"
+                          : "bg-zinc-100 text-zinc-950 hover:bg-white"
                       }`}
                     >
                       {isImported ? "Imported" : isImporting ? "Importing" : "Import"}
@@ -175,7 +175,7 @@ export default function ImportModal({ onClose, onImportSuccess }: ImportModalPro
         <div className="border-t border-zinc-900 bg-zinc-950 p-4 flex justify-end">
           <button
             onClick={onClose}
-            className="rounded-none border border-zinc-850 bg-zinc-950 px-4 py-2 text-[10px] font-mono uppercase tracking-wider text-zinc-450 hover:text-white hover:bg-zinc-900 hover:border-zinc-750 transition-all cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-zinc-650"
+            className="rounded-none border border-zinc-850 bg-zinc-950 px-4 py-2 text-[10px] font-mono uppercase tracking-wider text-zinc-455 hover:text-white hover:bg-zinc-900 hover:border-zinc-750 transition-all cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-zinc-600"
           >
             Close
           </button>

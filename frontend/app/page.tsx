@@ -94,63 +94,63 @@ export default function Home() {
   if (!user) {
     return (
       <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100 font-sans selection:bg-zinc-800">
-        <main className="flex flex-1 flex-col items-center justify-center px-6 py-20 sm:px-12 lg:px-16">
+        <main className="flex flex-1 flex-col items-center justify-center px-6 py-24 sm:px-12 lg:px-16">
           <div className="w-full max-w-lg">
             {/* Header / Brand */}
-            <div className="flex flex-col items-center mb-12 text-center">
-              <div className="font-serif italic text-3xl font-normal tracking-wide text-zinc-300 mb-6 select-none">
+            <div className="flex flex-col items-center mb-16 text-center">
+              <div className="font-serif italic text-4xl font-normal tracking-wide text-zinc-200 mb-8 select-none">
                 SecondCommit
               </div>
               
-              <h1 className="text-4xl font-serif text-white tracking-tight leading-tight max-w-md">
+              <h1 className="text-5xl font-serif text-white tracking-tight leading-tight max-w-md font-light">
                 Your codebase has a story.
               </h1>
-              <p className="mt-4 text-xs font-sans text-zinc-400 max-w-sm leading-relaxed">
+              <p className="mt-5 text-sm font-sans text-zinc-400 max-w-md leading-relaxed">
                 A premium developer intelligence workspace delivering rigorous repository grading, activity metrics, and structural recommendations.
               </p>
             </div>
 
             {/* Login Box / Call to action */}
-            <div className="border border-zinc-900 bg-zinc-950/40 p-8 text-center backdrop-blur-sm">
+            <div className="border border-zinc-900 bg-zinc-950/20 p-8 text-center backdrop-blur-sm">
               <button
                 onClick={handleLogin}
-                className="flex w-full items-center justify-center gap-3 rounded-none border border-zinc-800 bg-zinc-900 px-4 py-3 text-xs font-semibold text-white hover:bg-zinc-800 hover:border-zinc-700 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-zinc-600"
+                className="flex w-full items-center justify-center gap-2.5 rounded-none bg-zinc-100 text-zinc-950 px-4 py-3.5 text-xs font-mono uppercase tracking-wider hover:bg-white transition-colors cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400"
               >
-                <svg className="h-4 w-4 fill-current text-white" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 fill-current text-zinc-950" viewBox="0 0 24 24">
                   <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
                 </svg>
                 Connect with GitHub
               </button>
-              <p className="mt-4 text-[10px] font-mono text-zinc-500 leading-normal">
+              <p className="mt-4 text-[10px] font-mono text-zinc-550 leading-normal">
                 Requires read access to public and private repository metadata.
               </p>
             </div>
 
             {/* Feature List (Sleek Flat Table) */}
-            <div className="mt-12 border-t border-zinc-900 divide-y divide-zinc-900/60">
-              <div className="py-5 flex gap-6 text-left">
-                <span className="text-xs font-mono text-zinc-500 font-bold select-none">01</span>
+            <div className="mt-16 border-t border-zinc-900 divide-y divide-zinc-900/60">
+              <div className="py-6 flex gap-6 text-left">
+                <span className="text-xs font-mono text-zinc-600 font-bold select-none">01</span>
                 <div>
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Automated Grading</span>
-                  <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
+                  <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Automated Grading</span>
+                  <p className="mt-1.5 text-xs text-zinc-500 leading-relaxed font-sans">
                     Compute health grades (A to D) based on documentation, activity, and codebase structure.
                   </p>
                 </div>
               </div>
-              <div className="py-5 flex gap-6 text-left">
-                <span className="text-xs font-mono text-zinc-500 font-bold select-none">02</span>
+              <div className="py-6 flex gap-6 text-left">
+                <span className="text-xs font-mono text-zinc-600 font-bold select-none">02</span>
                 <div>
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Dormancy Tracking</span>
-                  <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
+                  <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Dormancy Tracking</span>
+                  <p className="mt-1.5 text-xs text-zinc-500 leading-relaxed font-sans">
                     Monitor repository freshness, push cycles, and get flagged for inactive maintenance.
                   </p>
                 </div>
               </div>
-              <div className="py-5 flex gap-6 text-left">
-                <span className="text-xs font-mono text-zinc-500 font-bold select-none">03</span>
+              <div className="py-6 flex gap-6 text-left">
+                <span className="text-xs font-mono text-zinc-600 font-bold select-none">03</span>
                 <div>
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">AI Recommendations</span>
-                  <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
+                  <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">AI Recommendations</span>
+                  <p className="mt-1.5 text-xs text-zinc-500 leading-relaxed font-sans">
                     Analyze repository metadata and receive actionable suggestions for improvement.
                   </p>
                 </div>
@@ -237,13 +237,13 @@ export default function Home() {
                     <div className="divide-y divide-zinc-900/60">
                       <div className="flex items-center justify-between py-3">
                         <span className="text-xs text-zinc-400">Active Repositories</span>
-                        <span className="text-xs font-mono text-emerald-450 tracking-tight font-medium">
+                        <span className="text-xs font-mono text-emerald-400 tracking-tight font-medium">
                           {analytics.active_repositories}
                         </span>
                       </div>
                       <div className="flex items-center justify-between py-3">
                         <span className="text-xs text-zinc-400">Dormant Repositories</span>
-                        <span className="text-xs font-mono text-rose-455 tracking-tight font-medium">
+                        <span className="text-xs font-mono text-rose-450 tracking-tight font-medium">
                           {analytics.dormant_repositories}
                         </span>
                       </div>
