@@ -85,35 +85,39 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 90) return "text-emerald-400 border-emerald-900/50 bg-emerald-950/20";
-    if (score >= 80) return "text-teal-400 border-teal-900/50 bg-teal-950/20";
-    if (score >= 70) return "text-amber-400 border-amber-900/50 bg-amber-950/20";
-    return "text-rose-400 border-rose-900/50 bg-rose-950/20";
+    if (score >= 90) return "text-semantic-healthy border border-semantic-healthy/20 bg-semantic-healthy/10";
+    if (score >= 80) return "text-teal-600 border border-teal-200 bg-teal-50";
+    if (score >= 70) return "text-semantic-warning border border-semantic-warning/20 bg-semantic-warning/10";
+    return "text-semantic-critical border border-semantic-critical/20 bg-semantic-critical/10";
   };
 
   const getDormancyColor = (status: string) => {
-    if (status.toLowerCase() === "active") return "text-emerald-400 border-emerald-900/50 bg-emerald-950/20";
-    return "text-rose-400 border-rose-900/50 bg-rose-950/20";
+    if (status.toLowerCase() === "active") return "text-semantic-healthy border border-semantic-healthy/20 bg-semantic-healthy/10";
+    return "text-semantic-critical border border-semantic-critical/20 bg-semantic-critical/10";
   };
 
   if (loading) {
     return (
-      <div className="flex h-[60vh] flex-col items-center justify-center gap-2">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-        <span className="text-xs text-zinc-550">Loading analysis data...</span>
+      <div className="flex h-[60vh] flex-col items-center justify-center gap-4 bg-background select-none">
+        <div className="flex items-center gap-1.5">
+          <div className="h-1 w-1 rounded-full bg-border-strong animate-pulse" />
+          <div className="h-1 w-1 rounded-full bg-border-strong animate-pulse [animation-delay:0.2s]" />
+          <div className="h-1 w-1 rounded-full bg-border-strong animate-pulse [animation-delay:0.4s]" />
+        </div>
+        <span className="text-[10px] font-mono tracking-wider uppercase text-text-secondary">Loading codebase metrics</span>
       </div>
     );
   }
 
   if (error || !repo) {
     return (
-      <div className="mx-auto max-w-xl px-6 py-16 text-center">
-        <div className="rounded-lg border border-red-900/50 bg-red-950/20 p-5">
-          <h3 className="text-sm font-semibold text-red-400">Error Loading Details</h3>
-          <p className="mt-2 text-xs text-red-400/80">{error || "Repository details not found."}</p>
+      <div className="mx-auto max-w-xl px-6 py-16 text-center select-none">
+        <div className="border border-semantic-critical/30 bg-semantic-critical/5 p-6 rounded-none shadow-sm">
+          <h3 className="text-xs font-mono uppercase tracking-widest text-semantic-critical font-bold">Error Loading Details</h3>
+          <p className="mt-2 text-xs text-text-secondary leading-relaxed">{error || "Repository details not found."}</p>
           <button
             onClick={onBack}
-            className="mt-4 rounded bg-red-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-red-500 transition-colors"
+            className="mt-5 rounded-none border border-border-muted bg-surface-secondary px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-text-secondary hover:text-text-primary hover:border-border-strong transition-all duration-150 cursor-pointer outline-none"
           >
             Go Back
           </button>
@@ -123,154 +127,156 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-5xl px-6 py-12">
       {/* Back button & Action Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-baseline sm:justify-between mb-10 select-none">
+        <div className="flex items-baseline gap-4">
           <button
             onClick={onBack}
-            className="rounded border border-zinc-900 p-1.5 text-zinc-500 hover:bg-zinc-900 hover:text-white transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+            className="rounded-none border border-border-muted bg-surface-secondary p-1.5 text-text-secondary hover:text-text-primary hover:border-border-strong transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
             </svg>
           </button>
           <div>
-            <h1 className="text-lg font-bold text-white tracking-tight">{repo.name}</h1>
-            <p className="text-[10px] text-zinc-550 font-mono mt-0.5">{repo.full_name}</p>
+            <h1 className="text-3xl font-outfit text-text-primary font-extrabold tracking-tight">{repo.name}</h1>
+            <p className="text-[10px] text-text-muted font-mono mt-1.5">{repo.full_name}</p>
           </div>
         </div>
 
         <button
           onClick={handleSync}
           disabled={syncing}
-          className={`flex items-center justify-center gap-2 rounded border border-zinc-800 bg-zinc-900/30 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-900 hover:border-zinc-700 transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 ${
-            syncing ? "cursor-not-allowed text-zinc-500" : ""
+          className={`flex items-center justify-center gap-2.5 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm hover:shadow-md ${
+            syncing ? "cursor-not-allowed bg-surface-base text-text-secondary border-border-muted shadow-none" : ""
           }`}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-          </svg>
+          {!syncing && (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="h-3.5 w-3.5"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+          )}
           {syncing ? "Syncing..." : "Sync GitHub Data"}
         </button>
       </div>
 
-      {/* Repo quick metadata (Single Row Divider) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-4 border-t border-b border-zinc-900 mb-8">
+      {/* Repo quick metadata */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-t border-b border-border-muted mb-10 select-none">
         <div>
-          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">GitHub Stars</span>
-          <p className="text-base font-semibold text-white mt-1 font-mono">{repo.stars ?? 0}</p>
+          <span className="text-[10px] font-mono font-bold text-text-secondary uppercase tracking-widest">GitHub Stars</span>
+          <p className="text-3xl font-mono text-text-primary mt-1.5 tracking-tight font-bold">{repo.stars ?? 0}</p>
         </div>
-        <div className="border-l border-zinc-900/60 pl-6">
-          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Forks</span>
-          <p className="text-base font-semibold text-white mt-1 font-mono">{repo.forks ?? 0}</p>
+        <div className="border-l border-border-muted pl-6">
+          <span className="text-[10px] font-mono font-bold text-text-secondary uppercase tracking-widest">Forks</span>
+          <p className="text-3xl font-mono text-text-primary mt-1.5 tracking-tight font-bold">{repo.forks ?? 0}</p>
         </div>
-        <div className="border-l border-zinc-900/60 pl-6">
-          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Open Issues</span>
-          <p className="text-base font-semibold text-white mt-1 font-mono">{repo.open_issues ?? 0}</p>
+        <div className="border-l border-border-muted pl-6">
+          <span className="text-[10px] font-mono font-bold text-text-secondary uppercase tracking-widest">Open Issues</span>
+          <p className="text-3xl font-mono text-text-primary mt-1.5 tracking-tight font-bold">{repo.open_issues ?? 0}</p>
         </div>
-        <div className="border-l border-zinc-900/60 pl-6">
-          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Storage Size</span>
-          <p className="text-base font-semibold text-white mt-1 font-mono">
+        <div className="border-l border-border-muted pl-6">
+          <span className="text-[10px] font-mono font-bold text-text-secondary uppercase tracking-widest">Storage Size</span>
+          <p className="text-3xl font-mono text-text-primary mt-1.5 tracking-tight font-bold">
             {repo.size ? `${(repo.size / 1024).toFixed(1)} MB` : "—"}
           </p>
         </div>
       </div>
 
       {/* Health, Grading & Maintenance Details */}
-      <div className="grid gap-6 md:grid-cols-3 mb-8">
+      <div className="grid gap-8 md:grid-cols-3 mb-10">
         {/* Health score gauge */}
         {health && (
-          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between">
+          <div className="border border-border-muted bg-surface-base p-6 flex flex-col justify-between rounded-none min-h-[195px] shadow-sm">
             <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Health Rating</span>
-              <div className="mt-3 flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold text-text-secondary uppercase tracking-widest select-none">Health Rating</span>
+              <div className="mt-4 flex items-center justify-between">
                 <div>
-                  <p className="text-2xl font-bold text-white font-mono">{health.health_score}/100</p>
-                  <p className="text-[10px] text-zinc-500 mt-1">Grade: <span className="font-semibold text-zinc-350 font-mono">{health.grade}</span></p>
+                  <p className="text-4xl font-mono text-text-primary font-bold tracking-tighter">{health.health_score}/100</p>
+                  <p className="text-[10px] text-text-secondary mt-1.5 font-mono select-none">Grade: <span className="font-bold text-text-primary">{health.grade}</span></p>
                 </div>
-                <div className={`h-10 w-10 rounded border flex items-center justify-center text-sm font-black ${getScoreColor(health.health_score)}`}>
+                <div className={`h-11 w-11 rounded-none border flex items-center justify-center text-sm font-mono font-bold select-none ${getScoreColor(health.health_score)}`}>
                   {health.grade}
                 </div>
               </div>
             </div>
-            <div className="mt-5 pt-3 border-t border-zinc-900/60">
-              <h4 className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Health Summary</h4>
-              <p className="text-xs text-zinc-500 leading-relaxed">{health.summary}</p>
+            <div className="mt-5 pt-3.5 border-t border-border-muted">
+              <h4 className="text-[9px] font-mono font-bold text-text-secondary uppercase tracking-widest mb-1.5 select-none">Health Summary</h4>
+              <p className="text-xs text-text-secondary leading-relaxed font-sans">{health.summary}</p>
             </div>
           </div>
         )}
 
         {/* Dormancy Maintenance status */}
         {dormancy && (
-          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between">
+          <div className="border border-border-muted bg-surface-base p-6 flex flex-col justify-between rounded-none min-h-[195px] shadow-sm">
             <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Activity Status</span>
-              <div className="mt-3 flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold text-text-secondary uppercase tracking-widest select-none">Activity Status</span>
+              <div className="mt-4 flex items-center justify-between">
                 <div>
-                  <p className="text-2xl font-bold text-white font-mono">
+                  <p className="text-4xl font-mono text-text-primary font-bold tracking-tighter">
                     {dormancy.days_since_last_push} {dormancy.days_since_last_push === 1 ? "day" : "days"}
                   </p>
-                  <p className="text-[10px] text-zinc-500 mt-1">Since last repository push</p>
+                  <p className="text-[10px] text-text-secondary mt-1.5 font-sans select-none">Since last repository push</p>
                 </div>
-                <div className={`rounded px-2.5 py-1 text-[10px] font-semibold border ${getDormancyColor(dormancy.status)}`}>
+                <div className={`rounded-none px-2.5 py-1 text-[10px] font-mono uppercase font-bold border select-none ${getDormancyColor(dormancy.status)}`}>
                   {dormancy.status}
                 </div>
               </div>
             </div>
-            <div className="mt-5 pt-3 border-t border-zinc-900/60">
-              <h4 className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Maintenance Summary</h4>
-              <p className="text-xs text-zinc-500 leading-relaxed">{dormancy.message}</p>
+            <div className="mt-5 pt-3.5 border-t border-border-muted">
+              <h4 className="text-[9px] font-mono font-bold text-text-secondary uppercase tracking-widest mb-1.5 select-none">Maintenance Summary</h4>
+              <p className="text-xs text-text-secondary leading-relaxed font-sans">{dormancy.message}</p>
             </div>
           </div>
         )}
 
-        {/* Developer complexity & AI score / Empty State / Loading State / Error State */}
+        {/* Developer complexity & AI score */}
         {aiInsights && (
-          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between">
+          <div className="border border-border-muted bg-surface-base p-6 flex flex-col justify-between rounded-none min-h-[195px] shadow-sm">
             <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">AI Quality Score</span>
-              <div className="mt-3 flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold text-text-secondary uppercase tracking-widest select-none">AI Quality Score</span>
+              <div className="mt-4 flex items-center justify-between">
                 <div>
-                  <p className="text-2xl font-bold text-white font-mono">{aiInsights.ai_score}/100</p>
-                  <p className="text-[10px] text-zinc-500 mt-1">Complexity: <span className="font-semibold text-zinc-350">{aiInsights.complexity}</span></p>
+                  <p className="text-4xl font-mono text-text-primary font-bold tracking-tighter">{aiInsights.ai_score}/100</p>
+                  <p className="text-[10px] text-text-secondary mt-1.5 font-sans select-none">Complexity: <span className="font-bold text-text-primary font-mono">{aiInsights.complexity}</span></p>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className={`rounded px-2.5 py-1 text-[10px] font-semibold border ${
+                <div className="flex flex-col items-end gap-1 select-none">
+                  <span className={`rounded-none px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider font-bold border ${
                     aiInsights.beginner_friendly
-                      ? "text-emerald-400 border-emerald-955 bg-emerald-955/20"
-                      : "text-amber-400 border-amber-955 bg-amber-955/20"
+                      ? "text-semantic-healthy border-semantic-healthy/20 bg-semantic-healthy/10"
+                      : "text-semantic-warning border-semantic-warning/20 bg-semantic-warning/10"
                   }`}>
-                    {aiInsights.beginner_friendly ? "Easy Intro" : "Complex"}
+                    {aiInsights.beginner_friendly ? "Intro friendly" : "Complex"}
                   </span>
                 </div>
               </div>
             </div>
-            <div className="mt-5 pt-3 border-t border-zinc-900/60">
-              <h4 className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">AI Recommendation</h4>
-              <p className="text-xs text-zinc-500 leading-relaxed truncate">{aiInsights.summary}</p>
+            <div className="mt-5 pt-3.5 border-t border-border-muted">
+              <h4 className="text-[9px] font-mono font-bold text-text-secondary uppercase tracking-widest mb-1.5 select-none">AI Recommendation</h4>
+              <p className="text-xs text-text-secondary leading-relaxed truncate font-sans">{aiInsights.summary}</p>
             </div>
           </div>
         )}
 
         {!aiInsights && !aiLoading && !aiError && (
-          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between min-h-[180px]">
+          <div className="border border-border-muted bg-surface-base p-6 flex flex-col justify-between rounded-none min-h-[195px] shadow-sm">
             <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">AI Repository Analysis</span>
-              <p className="mt-2 text-xs text-zinc-500 leading-normal">
+              <span className="text-[10px] font-mono font-bold text-text-secondary uppercase tracking-widest select-none">AI Repository Analysis</span>
+              <p className="mt-3 text-xs text-text-secondary leading-relaxed font-sans">
                 Generate an AI-powered analysis of this repository, including strengths, weaknesses, and actionable recommendations.
               </p>
             </div>
             <button
               onClick={handleGenerateAI}
-              className="mt-4 w-full rounded border border-zinc-850 bg-zinc-900/50 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-905 hover:border-zinc-700 transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+              className="mt-5 w-full rounded-none border border-border-muted bg-surface-secondary px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest text-text-secondary hover:text-text-primary hover:border-border-strong hover:bg-surface-base transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm"
             >
               Generate AI Analysis
             </button>
@@ -278,24 +284,28 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
         )}
 
         {aiLoading && (
-          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-center items-center min-h-[180px] text-center">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent mb-3" />
-            <span className="text-xs font-semibold text-zinc-350">Analyzing codebase...</span>
-            <span className="text-[9px] text-zinc-550 mt-1">Requesting LLM analysis of repository stats</span>
+          <div className="border border-border-muted bg-surface-base p-6 flex flex-col justify-center items-center rounded-none min-h-[195px] text-center select-none shadow-sm">
+            <div className="flex items-center gap-1.5 mb-3">
+              <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse" />
+              <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse [animation-delay:0.2s]" />
+              <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse [animation-delay:0.4s]" />
+            </div>
+            <span className="text-xs font-bold text-text-primary">Analyzing codebase...</span>
+            <span className="text-[9px] text-text-muted mt-1.5 font-mono uppercase tracking-wider">Requesting LLM assessment</span>
           </div>
         )}
 
         {aiError && (
-          <div className="rounded-md border border-zinc-900 bg-zinc-950/10 p-5 flex flex-col justify-between min-h-[180px]">
+          <div className="border border-border-muted bg-surface-base p-6 flex flex-col justify-between rounded-none min-h-[195px] shadow-sm">
             <div>
-              <span className="text-[10px] font-bold text-rose-450 uppercase tracking-wider">AI Analysis Failed</span>
-              <p className="mt-2 text-xs text-rose-450/80 leading-normal line-clamp-3">
+              <span className="text-[10px] font-mono font-bold text-semantic-critical uppercase tracking-widest select-none">AI Analysis Failed</span>
+              <p className="mt-3 text-xs text-semantic-critical/80 leading-relaxed line-clamp-3">
                 {aiError}
               </p>
             </div>
             <button
               onClick={handleGenerateAI}
-              className="mt-4 w-full rounded border border-red-900 bg-red-950/30 px-3.5 py-1.5 text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-950/50 hover:border-red-800 transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+              className="mt-5 w-full rounded-none border border-semantic-critical/30 bg-semantic-critical/5 px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest text-semantic-critical hover:bg-semantic-critical/10 transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
             >
               Retry AI Analysis
             </button>
@@ -305,23 +315,23 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
 
       {/* AI Detailed Insights */}
       {aiInsights && (
-        <div className="rounded-md border border-zinc-900 bg-zinc-950/20 p-6">
-          <div className="mb-6 border-b border-zinc-900/60 pb-4">
-            <h2 className="text-xs font-semibold uppercase text-zinc-400 tracking-wider">AI Repository Deep Dive</h2>
-            <p className="text-[10px] text-zinc-550 mt-0.5">Machine learning analysis and structural recommendations.</p>
+        <div className="border border-border-muted bg-surface-base p-8 rounded-none shadow-sm">
+          <div className="mb-8 border-b border-border-muted pb-5 select-none">
+            <h2 className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-accent">✦ AI INSIGHT</h2>
+            <p className="text-[10px] text-text-secondary mt-1 font-sans">Machine learning analysis and structural recommendations.</p>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-zinc-900">
-            {/* Strengths */}
-            <div className="pr-0 md:pr-4">
-              <h3 className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 uppercase tracking-wide mb-3">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          <div className="grid gap-10 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border-muted">
+            {/* Core Strengths */}
+            <div className="pr-0 md:pr-6">
+              <h3 className="flex items-center gap-2 text-[10px] font-mono font-bold text-semantic-healthy uppercase tracking-widest mb-5 select-none">
+                <span className="h-1.5 w-1.5 rounded-full bg-semantic-healthy" />
                 Core Strengths
               </h3>
-              <ul className="space-y-2">
+              <ul className="space-y-3.5">
                 {aiInsights.strengths.map((strength, idx) => (
-                  <li key={idx} className="flex gap-2 text-xs text-zinc-400 leading-relaxed">
-                    <span className="text-emerald-500 shrink-0 select-none">-</span>
+                  <li key={idx} className="flex gap-2.5 text-xs text-text-secondary leading-relaxed font-sans">
+                    <span className="text-brand-accent shrink-0 select-none font-mono font-bold">-</span>
                     <span>{strength}</span>
                   </li>
                 ))}
@@ -329,15 +339,15 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
             </div>
 
             {/* Weaknesses */}
-            <div className="pt-6 md:pt-0 pl-0 md:pl-8 pr-0 md:pr-4">
-              <h3 className="flex items-center gap-1.5 text-xs font-bold text-rose-450 uppercase tracking-wide mb-3">
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-450" />
+            <div className="pt-6 md:pt-0 pl-0 md:pl-8 pr-0 md:pr-6">
+              <h3 className="flex items-center gap-2 text-[10px] font-mono font-bold text-semantic-critical uppercase tracking-widest mb-5 select-none">
+                <span className="h-1.5 w-1.5 rounded-full bg-semantic-critical" />
                 Weaknesses
               </h3>
-              <ul className="space-y-2">
+              <ul className="space-y-3.5">
                 {aiInsights.weaknesses.map((weakness, idx) => (
-                  <li key={idx} className="flex gap-2 text-xs text-zinc-400 leading-relaxed">
-                    <span className="text-rose-500 shrink-0 select-none">-</span>
+                  <li key={idx} className="flex gap-2.5 text-xs text-text-secondary leading-relaxed font-sans">
+                    <span className="text-brand-accent shrink-0 select-none font-mono font-bold">-</span>
                     <span>{weakness}</span>
                   </li>
                 ))}
@@ -346,14 +356,14 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
 
             {/* Suggestions */}
             <div className="pt-6 md:pt-0 pl-0 md:pl-8">
-              <h3 className="flex items-center gap-1.5 text-xs font-bold text-indigo-400 uppercase tracking-wide mb-3">
-                <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+              <h3 className="flex items-center gap-2 text-[10px] font-mono font-bold text-text-primary uppercase tracking-widest mb-5 select-none">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
                 Action Items
               </h3>
-              <ul className="space-y-2">
+              <ul className="space-y-3.5">
                 {aiInsights.suggestions.map((suggestion, idx) => (
-                  <li key={idx} className="flex gap-2 text-xs text-zinc-400 leading-relaxed">
-                    <span className="text-indigo-500 shrink-0 select-none">-</span>
+                  <li key={idx} className="flex gap-2.5 text-xs text-text-secondary leading-relaxed font-sans">
+                    <span className="text-brand-accent shrink-0 select-none font-mono font-bold">-</span>
                     <span>{suggestion}</span>
                   </li>
                 ))}

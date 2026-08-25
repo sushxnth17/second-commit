@@ -45,21 +45,27 @@ export default function Dashboard({
   const getHealthBadgeColor = (grade?: string) => {
     switch (grade) {
       case "A":
-        return "text-emerald-400 border-emerald-950 bg-emerald-950/20";
+        return "text-semantic-healthy border border-semantic-healthy/20 bg-semantic-healthy/10";
       case "B":
-        return "text-teal-400 border-teal-955 bg-teal-955/20";
+        return "text-teal-600 border border-teal-250 bg-teal-50";
       case "C":
-        return "text-amber-400 border-amber-950 bg-amber-955/20";
+        return "text-semantic-warning border border-semantic-warning/20 bg-semantic-warning/10";
       default:
-        return "text-rose-400 border-rose-950 bg-rose-955/20";
+        return "text-semantic-critical border border-semantic-critical/20 bg-semantic-critical/10";
     }
   };
 
   const getDormancyBadgeColor = (status?: string) => {
     if (status?.toLowerCase() === "active") {
-      return "text-emerald-400 border-emerald-950 bg-emerald-950/20";
+      return "text-semantic-healthy border border-semantic-healthy/20 bg-semantic-healthy/10";
     }
-    return "text-rose-400 border-rose-950 bg-rose-955/20";
+    return "text-semantic-critical border border-semantic-critical/20 bg-semantic-critical/10";
+  };
+
+  const getGradeBarColor = (grade: "A" | "B" | "C" | "D" | "F") => {
+    if (grade === "A" || grade === "B") return "bg-semantic-healthy";
+    if (grade === "C") return "bg-semantic-warning";
+    return "bg-semantic-critical";
   };
 
   // 1. Calculate Grade distribution
@@ -84,7 +90,6 @@ export default function Dashboard({
   const filteredRepos = repos.filter((repo) => {
     const matchesSearch = repo.name.toLowerCase().includes(search.toLowerCase());
     const matchesLang = langFilter === "all" || repo.language === langFilter;
-    
     let matchesHealth = true;
     if (healthFilter === "critical") {
       matchesHealth = (repo.health_score !== undefined && repo.health_score < 70);
@@ -103,20 +108,20 @@ export default function Dashboard({
   });
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
+    <div className="mx-auto max-w-5xl px-6 py-12 select-none">
       {/* Dashboard Greeting Hero */}
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="mb-12 flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-4">
         <div>
-          <h1 className="text-lg font-bold text-white tracking-tight">
+          <h1 className="text-3xl font-outfit text-text-primary tracking-tight font-extrabold">
             Welcome back, {user.name || user.username}.
           </h1>
-          <p className="mt-0.5 text-xs text-zinc-500">Here's how your repositories are doing.</p>
+          <p className="mt-1.5 text-xs text-text-secondary font-sans select-none">Here's how your repositories are doing.</p>
         </div>
         <button
           onClick={onImportClick}
-          className="flex items-center justify-center gap-1.5 rounded border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:text-white hover:bg-zinc-850 hover:border-zinc-700 transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+          className="flex items-center justify-center gap-2.5 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm hover:shadow-md"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           Import Repository
@@ -124,139 +129,128 @@ export default function Dashboard({
       </div>
 
       {/* Health Overview & Metrics Row */}
-      <div className="grid gap-8 md:grid-cols-5 border-t border-b border-zinc-900 py-6 mb-8">
+      <div className="grid gap-12 md:grid-cols-5 border-t border-b border-border-muted py-8 mb-12 bg-transparent select-none">
         {/* Left column: Repository Health distribution */}
-        <div className="md:col-span-3 flex flex-col justify-between pr-0 md:pr-8 border-r-0 md:border-r border-zinc-900">
+        <div className="md:col-span-3 flex flex-col justify-between pr-0 md:pr-10 border-r-0 md:border-r border-border-muted">
           <div>
-            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Repository Health</h3>
-            <div className="flex items-baseline gap-4 mb-4">
-              <div>
-                <span className="text-3xl font-bold text-white font-mono tracking-tight">
-                  {analytics?.average_health_score !== null && analytics?.average_health_score !== undefined
-                    ? Math.round(analytics.average_health_score)
-                    : "—"}
-                </span>
-                <span className="text-xs text-zinc-500 ml-1">/ 100 average</span>
-              </div>
-              <div className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${
-                getHealthBadgeColor(
-                  analytics?.average_health_score !== null && analytics?.average_health_score !== undefined
-                    ? (analytics.average_health_score >= 90 ? "A" : analytics.average_health_score >= 80 ? "B" : analytics.average_health_score >= 70 ? "C" : "D")
-                    : undefined
-                )
-              }`}>
-                Grade {
+            <h3 className="text-[10px] font-mono font-bold text-text-muted uppercase tracking-widest mb-5">Repository Health</h3>
+            <div className="flex items-baseline gap-4 mb-6">
+              <span className="text-6xl font-mono text-text-primary tracking-tighter leading-none font-bold">
+                {analytics?.average_health_score !== null && analytics?.average_health_score !== undefined
+                  ? Math.round(analytics.average_health_score)
+                  : "—"}
+              </span>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block leading-none">AVERAGE HEALTH</span>
+                <span className="text-[10px] font-mono text-text-secondary mt-1 font-bold block leading-none">GRADE {
                   analytics?.average_health_score !== null && analytics?.average_health_score !== undefined
                     ? (analytics.average_health_score >= 90 ? "A" : analytics.average_health_score >= 80 ? "B" : analytics.average_health_score >= 70 ? "C" : "D")
                     : "—"
-                }
+                }</span>
               </div>
             </div>
           </div>
 
           {/* Distribution list */}
-          <div className="space-y-2 text-xs text-zinc-500 max-w-sm">
+          <div className="space-y-2.5 text-xs text-text-secondary max-w-sm">
             {(["A", "B", "C", "D", "F"] as const).map((grade) => (
               <div key={grade} className="flex items-center gap-3">
-                <span className="w-3 font-semibold text-zinc-400 text-right">{grade}</span>
-                <div className="h-1 flex-1 rounded-sm bg-zinc-900 overflow-hidden">
+                <span className="w-3 font-mono text-[10px] text-text-secondary text-right select-none">{grade}</span>
+                <div className="h-[1.5px] flex-1 bg-border-muted">
                   <div
-                    className="h-full bg-indigo-500 transition-all"
+                    className={`h-full ${getGradeBarColor(grade)} transition-all`}
                     style={{
                       width: `${(gradeCounts[grade] / Math.max(repos.length, 1)) * 100}%`,
                     }}
                   />
                 </div>
-                <span className="w-4 text-right font-mono text-[10px] text-zinc-500">
+                <span className="w-4 text-right font-mono text-[9px] text-text-secondary select-none">
                   {gradeCounts[grade]}
                 </span>
               </div>
             ))}
-            <div className="mt-4 pt-3 text-[10px] text-zinc-500 border-t border-zinc-900">
+            <div className="mt-6 pt-4 text-[10px] font-mono uppercase tracking-wider text-text-secondary border-t border-border-muted">
               {reposNeedingAttention.length > 0 ? (
-                <span className="text-rose-400 font-semibold">{reposNeedingAttention.length} {reposNeedingAttention.length === 1 ? "repository needs" : "repositories need"} attention.</span>
+                <span className="text-semantic-critical font-bold">{reposNeedingAttention.length} {reposNeedingAttention.length === 1 ? "repository requires" : "repositories require"} attention.</span>
               ) : (
-                <span className="text-emerald-400 font-semibold">All repositories are currently stable.</span>
+                <span className="text-semantic-healthy font-bold">All repositories are currently stable.</span>
               )}
             </div>
           </div>
         </div>
 
         {/* Right column: Aggregate Metrics */}
-        <div className="md:col-span-2 flex flex-col justify-between pl-0 md:pl-4 gap-6 md:gap-0">
+        <div className="md:col-span-2 flex flex-col justify-between pl-0 md:pl-2 gap-6 md:gap-0">
           <div>
-            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Portfolio Summary</h3>
-            <div className="divide-y divide-zinc-900">
-              <div className="flex justify-between py-2">
-                <span className="text-xs text-zinc-500">Total Repositories</span>
-                <span className="text-xs font-semibold text-white font-mono tracking-tight">{repos.length}</span>
+            <h3 className="text-[10px] font-mono font-bold text-text-muted uppercase tracking-widest mb-4">Portfolio Summary</h3>
+            <div className="divide-y divide-border-muted">
+              <div className="flex justify-between py-3">
+                <span className="text-xs text-text-secondary font-medium">Total Repositories</span>
+                <span className="text-xs font-mono text-text-primary font-bold tracking-tight">{repos.length}</span>
               </div>
-              <div className="flex justify-between py-2">
-                <span className="text-xs text-zinc-500">Active / Dormant</span>
-                <span className="text-xs font-semibold text-white font-mono tracking-tight">
-                  <span className="text-emerald-400">{analytics?.active_repositories ?? 0}</span>
-                  <span className="text-zinc-700 mx-1">/</span>
-                  <span className="text-rose-400">{analytics?.dormant_repositories ?? 0}</span>
+              <div className="flex justify-between py-3">
+                <span className="text-xs text-text-secondary font-medium">Active / Dormant</span>
+                <span className="text-xs font-mono text-text-primary font-bold tracking-tight">
+                  <span className="text-semantic-healthy">{analytics?.active_repositories ?? 0}</span>
+                  <span className="text-text-muted mx-1.5 font-normal">/</span>
+                  <span className="text-semantic-critical">{analytics?.dormant_repositories ?? 0}</span>
                 </span>
               </div>
-              <div className="flex justify-between py-2">
-                <span className="text-xs text-zinc-500">Total Stars</span>
-                <span className="text-xs font-semibold text-white font-mono tracking-tight">{analytics?.total_stars ?? 0}</span>
+              <div className="flex justify-between py-3">
+                <span className="text-xs text-text-secondary font-medium">Total Stars</span>
+                <span className="text-xs font-mono text-text-primary font-bold tracking-tight">{analytics?.total_stars ?? 0}</span>
               </div>
-              <div className="flex justify-between py-2">
-                <span className="text-xs text-zinc-500">Total Forks</span>
-                <span className="text-xs font-semibold text-white font-mono tracking-tight">{analytics?.total_forks ?? 0}</span>
+              <div className="flex justify-between py-3">
+                <span className="text-xs text-text-secondary font-medium">Total Forks</span>
+                <span className="text-xs font-mono text-text-primary font-bold tracking-tight">{analytics?.total_forks ?? 0}</span>
               </div>
             </div>
           </div>
-          <p className="text-[9px] text-zinc-650 leading-normal">
-            Updated via GitHub hooks. Run sync inside repository details to force refresh active metrics.
+          <p className="text-[9px] font-mono text-text-muted leading-normal">
+            Updated via GitHub webhooks. Run sync inside repository details to force refresh active metrics.
           </p>
         </div>
       </div>
 
       {/* Needs Attention Section */}
       {reposNeedingAttention.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-rose-450">Needs attention</h2>
-            <p className="text-[10px] text-zinc-500 mt-0.5">Repositories with low health ratings or inactive pushes.</p>
+        <div className="mb-12">
+          <div className="flex items-baseline justify-between border-b border-border-muted pb-3 mb-4 select-none">
+            <h2 className="text-[10px] font-mono font-bold uppercase tracking-widest text-semantic-critical">Needs attention</h2>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-text-secondary font-bold">
+              {reposNeedingAttention.length} {reposNeedingAttention.length === 1 ? "repository" : "repositories"}
+            </span>
           </div>
-          
-          <div className="rounded-md border border-zinc-900 bg-zinc-950/20 overflow-hidden divide-y divide-zinc-900">
+          <div className="divide-y divide-border-muted border-t border-b border-border-muted bg-transparent">
             {reposNeedingAttention.slice(0, 3).map((repo) => (
               <div
                 key={repo.id}
                 onClick={() => onSelectRepo(repo.id)}
-                className="flex items-center justify-between p-4 hover:bg-zinc-900/10 transition-colors cursor-pointer"
+                className="flex items-center justify-between py-5 px-2 hover:bg-surface-secondary/40 transition-all duration-150 cursor-pointer group"
               >
                 <div className="flex-1 min-w-0 pr-4">
-                  <h4 className="font-semibold text-xs text-zinc-200 truncate">
+                  <h4 className="font-outfit text-sm font-bold text-text-primary group-hover:text-brand-accent transition-colors duration-150 truncate">
                     {repo.name}
                   </h4>
-                  <div className="mt-1 flex items-center gap-3">
-                    {repo.language && (
-                      <span className="rounded bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 text-[9px] text-zinc-400">
-                        {repo.language}
-                      </span>
-                    )}
-                    <span className="text-[9px] text-zinc-500 font-mono">
-                      last activity: {getDaysAgo(repo.pushed_at)}
-                    </span>
-                  </div>
+                  <p className="text-[8px] font-mono uppercase tracking-widest text-text-muted mt-1 select-none">
+                    LAST ACTIVITY: {getDaysAgo(repo.pushed_at)}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-4 shrink-0">
-                  <div className="text-right hidden sm:block">
-                    <span className="text-[9px] text-zinc-500 uppercase tracking-wider block">Health</span>
-                    <span className="text-xs font-semibold text-white font-mono tracking-tight mt-0.5 block">{repo.health_score ?? 0}</span>
-                  </div>
-                  <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${getHealthBadgeColor(repo.health_grade)}`}>
+                <div className="flex items-center gap-8 shrink-0 select-none">
+                  {/* Grade badge */}
+                  <span className={`rounded-none border px-2 py-0.5 text-[9px] font-mono uppercase font-bold ${getHealthBadgeColor(repo.health_grade)}`}>
                     {repo.health_grade || "F"}
                   </span>
-                  <span className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors uppercase tracking-wider pl-2 select-none">
-                    View
+                  {/* Score */}
+                  <span className="text-sm font-mono text-text-primary tracking-tight font-bold w-8 text-right">
+                    {repo.health_score ?? 0}
                   </span>
+                  {/* Action */}
+                  <div className="flex items-center text-[10px] font-mono uppercase tracking-widest text-text-secondary group-hover:text-brand-accent transition-colors duration-150 pl-2">
+                    <span>View</span>
+                    <span className="ml-1.5 transform group-hover:translate-x-1 transition-transform duration-150">→</span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -265,10 +259,10 @@ export default function Dashboard({
       )}
 
       {/* All Repositories Section */}
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">All Repositories</h2>
-          <p className="text-[10px] text-zinc-500 mt-0.5">Explore metrics, stars, and language details for your codebase.</p>
+          <h2 className="text-[10px] font-mono font-bold uppercase tracking-widest text-text-secondary">All Repositories</h2>
+          <p className="text-[10px] text-text-secondary mt-1 select-none">Explore metrics, stars, and language details for your codebase.</p>
         </div>
 
         {/* Filters */}
@@ -280,7 +274,7 @@ export default function Dashboard({
               placeholder="Search repositories..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full sm:w-44 rounded border border-zinc-900 bg-zinc-950 py-1.5 pl-8 pr-3 text-xs text-white outline-none placeholder:text-zinc-550 transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus-visible:ring-1 focus-visible:ring-indigo-500 focus-visible:border-indigo-500"
+              className="w-full sm:w-48 rounded-none border border-border-muted bg-surface-base py-1.5 pl-8 pr-3 text-xs text-text-primary outline-none transition-all focus:border-brand-accent"
             />
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -288,7 +282,7 @@ export default function Dashboard({
               viewBox="0 0 24 24"
               strokeWidth={2}
               stroke="currentColor"
-              className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-550"
+              className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-secondary"
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
             </svg>
@@ -298,7 +292,7 @@ export default function Dashboard({
           <select
             value={langFilter}
             onChange={(e) => setLangFilter(e.target.value)}
-            className="rounded border border-zinc-900 bg-zinc-950 py-1.5 px-2.5 text-xs text-zinc-400 outline-none hover:border-zinc-800 cursor-pointer focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus-visible:ring-1 focus-visible:ring-indigo-500 focus-visible:border-indigo-500"
+            className="rounded-none border border-border-muted bg-surface-base py-1.5 px-3 text-xs text-text-secondary outline-none cursor-pointer focus:border-brand-accent transition-all"
           >
             <option value="all">All Languages</option>
             {uniqueLanguages.map((lang) => (
@@ -312,7 +306,7 @@ export default function Dashboard({
           <select
             value={healthFilter}
             onChange={(e) => setHealthFilter(e.target.value)}
-            className="rounded border border-zinc-900 bg-zinc-950 py-1.5 px-2.5 text-xs text-zinc-400 outline-none hover:border-zinc-800 cursor-pointer focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus-visible:ring-1 focus-visible:ring-indigo-500 focus-visible:border-indigo-500"
+            className="rounded-none border border-border-muted bg-surface-base py-1.5 px-3 text-xs text-text-secondary outline-none cursor-pointer focus:border-brand-accent transition-all"
           >
             <option value="all">All Health</option>
             <option value="healthy">Healthy (A-C)</option>
@@ -323,7 +317,7 @@ export default function Dashboard({
           <select
             value={activityFilter}
             onChange={(e) => setActivityFilter(e.target.value)}
-            className="rounded border border-zinc-900 bg-zinc-950 py-1.5 px-2.5 text-xs text-zinc-400 outline-none hover:border-zinc-800 cursor-pointer focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus-visible:ring-1 focus-visible:ring-indigo-500 focus-visible:border-indigo-500"
+            className="rounded-none border border-border-muted bg-surface-base py-1.5 px-3 text-xs text-text-secondary outline-none cursor-pointer focus:border-brand-accent transition-all"
           >
             <option value="all">All Activity</option>
             <option value="active">Active</option>
@@ -334,83 +328,78 @@ export default function Dashboard({
 
       {/* Repositories Table */}
       {filteredRepos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-zinc-900 py-16 text-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded bg-zinc-950 text-zinc-550 border border-zinc-900 mb-4">
+        <div className="flex flex-col items-center justify-center rounded-none border border-dashed border-border-muted py-16 text-center bg-surface-base shadow-sm">
+          <div className="flex h-10 w-10 items-center justify-center bg-surface-secondary text-text-muted border border-border-muted mb-4 select-none">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 012.008 1.24l.885 1.77a2.25 2.25 0 002.007 1.24h1.98a2.25 2.25 0 002.007-1.24l.885-1.77a2.25 2.25 0 012.007-1.24h3.86m-18 0h18a2.25 2.25 0 012.25 2.25v4.5A2.25 2.25 0 0118 21H6a2.25 2.25 0 01-2.25-2.25v-4.5a2.25 2.25 0 012.25-2.25z" />
             </svg>
           </div>
-          <h3 className="text-xs font-semibold text-zinc-350">No repositories matching filters</h3>
-          <p className="mt-1 text-[10px] text-zinc-550 max-w-xs leading-normal">
+          <h3 className="text-xs font-mono uppercase tracking-wider text-text-secondary">No repositories matching filters</h3>
+          <p className="mt-1 text-[10px] text-text-secondary max-w-xs leading-normal font-sans">
             Try adjusting your search query, selecting another language filter, or import a new repository.
           </p>
           <button
             onClick={onImportClick}
-            className="mt-4 rounded border border-zinc-800 bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-850 hover:border-zinc-700 transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+            className="mt-5 rounded-none border border-border-muted bg-surface-secondary px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-text-secondary hover:text-text-primary hover:border-border-strong hover:bg-surface-base transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm"
           >
             Import Repository
           </button>
         </div>
       ) : (
-        <div className="rounded-md border border-zinc-900 bg-zinc-950/20 overflow-hidden overflow-x-auto">
-          <table className="w-full min-w-[700px] border-collapse text-left text-xs text-zinc-400">
-            <thead className="bg-zinc-950/40 text-[10px] uppercase font-medium tracking-wider text-zinc-500 border-b border-zinc-900">
+        <div className="border border-border-muted bg-surface-base overflow-hidden overflow-x-auto shadow-sm">
+          <table className="w-full min-w-[750px] border-collapse text-left text-xs text-text-secondary">
+            <thead className="bg-surface-base text-[9px] uppercase font-mono tracking-widest text-text-muted border-b border-border-muted select-none font-bold">
               <tr>
-                <th className="py-3 px-4">Repository</th>
-                <th className="py-3 px-4">Language</th>
-                <th className="py-3 px-4">Health</th>
-                <th className="py-3 px-4">Activity</th>
-                <th className="py-3 px-4 text-center">Stars</th>
-                <th className="py-3 px-4 text-center">Forks</th>
-                <th className="py-3 px-4">Last Updated</th>
-                <th className="py-3 px-4 text-right">Action</th>
+                <th className="py-3.5 px-4 font-bold">Repository</th>
+                <th className="py-3.5 px-4 font-bold">Language</th>
+                <th className="py-3.5 px-4 font-bold">Health</th>
+                <th className="py-3.5 px-4 font-bold">Activity</th>
+                <th className="py-3.5 px-4 text-center font-bold">Stars</th>
+                <th className="py-3.5 px-4 text-center font-bold">Forks</th>
+                <th className="py-3.5 px-4 font-bold">Last Updated</th>
+                <th className="py-3.5 px-4 text-right font-bold">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-900">
+            <tbody className="divide-y divide-border-muted">
               {filteredRepos.map((repo) => (
                 <tr
                   key={repo.id}
                   onClick={() => onSelectRepo(repo.id)}
-                  className="hover:bg-zinc-900/10 transition-colors cursor-pointer group"
+                  className="hover:bg-surface-secondary/40 transition-colors cursor-pointer group"
                 >
-                  <td className="py-3 px-4 font-semibold text-zinc-200 group-hover:text-white transition-colors max-w-[200px] truncate">
+                  <td className="py-3.5 px-4 font-outfit text-sm font-bold text-text-primary group-hover:text-brand-accent transition-colors duration-150 max-w-[220px] truncate">
                     {repo.name}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3.5 px-4 font-mono text-[9px] uppercase select-none">
                     {repo.language ? (
-                      <span className="rounded bg-zinc-900 border border-zinc-850 px-2 py-0.5 text-[10px] text-zinc-300">
+                      <span className="rounded-none bg-surface-secondary border border-border-muted px-2 py-0.5 text-[9px] text-text-secondary font-bold font-mono">
                         {repo.language}
                       </span>
                     ) : (
-                      <span className="text-zinc-650">—</span>
+                      <span className="text-text-muted font-normal">—</span>
                     )}
                   </td>
-                  <td className="py-3 px-4 font-mono">
-                    <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${getHealthBadgeColor(repo.health_grade)}`}>
+                  <td className="py-3.5 px-4 font-mono select-none">
+                    <span className={`rounded-none border px-1.5 py-0.5 text-[9px] font-bold ${getHealthBadgeColor(repo.health_grade)}`}>
                       {repo.health_grade || "—"}
                     </span>
-                    <span className="text-zinc-500 text-[10px] ml-1.5">{repo.health_score ?? "—"}</span>
+                    <span className="text-text-secondary text-[10px] ml-2 font-bold">{repo.health_score ?? "—"}</span>
                   </td>
-                  <td className="py-3 px-4">
-                    <span className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[10px] font-semibold border ${getDormancyBadgeColor(repo.dormancy_status)}`}>
+                  <td className="py-3.5 px-4 select-none">
+                    <span className={`inline-flex items-center gap-1.5 rounded-none px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider font-bold border ${getDormancyBadgeColor(repo.dormancy_status)}`}>
                       {repo.dormancy_status || "Unknown"}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-center font-mono tracking-tight">{repo.stars ?? 0}</td>
-                  <td className="py-3 px-4 text-center font-mono tracking-tight">{repo.forks ?? 0}</td>
-                  <td className="py-3 px-4 text-zinc-500 font-mono text-[10px] tracking-tight">
+                  <td className="py-3.5 px-4 text-center font-mono text-text-primary font-bold tracking-tight">{repo.stars ?? 0}</td>
+                  <td className="py-3.5 px-4 text-center font-mono text-text-primary font-bold tracking-tight">{repo.forks ?? 0}</td>
+                  <td className="py-3.5 px-4 text-text-muted font-mono text-[10px] tracking-tight select-none">
                     {getDaysAgo(repo.pushed_at)}
                   </td>
-                  <td className="py-3 px-4 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectRepo(repo.id);
-                      }}
-                      className="text-[10px] font-bold text-zinc-500 group-hover:text-white transition-colors uppercase tracking-wider select-none cursor-pointer"
-                    >
-                      View Analysis →
-                    </button>
+                  <td className="py-3.5 px-4 text-right select-none">
+                    <div className="flex items-center justify-end text-[10px] font-mono uppercase tracking-widest text-text-secondary group-hover:text-brand-accent transition-colors duration-150">
+                      <span>Analyze</span>
+                      <span className="ml-1.5 transform group-hover:translate-x-1 transition-transform duration-150">→</span>
+                    </div>
                   </td>
                 </tr>
               ))}
