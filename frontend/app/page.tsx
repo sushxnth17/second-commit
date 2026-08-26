@@ -17,6 +17,44 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Local handover states
+  const [handoverStates, setHandoverStates] = useState<Record<number, "not_started" | "in_progress" | "prepared">>({});
+  const [developerNotes, setDeveloperNotes] = useState<Record<number, string>>({});
+
+  // Load handover state from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedStates = localStorage.getItem("secondcommit_handover_states");
+      const storedNotes = localStorage.getItem("secondcommit_developer_notes");
+      if (storedStates) {
+        try {
+          setHandoverStates(JSON.parse(storedStates));
+        } catch (e) {
+          console.error("Failed to parse handover states:", e);
+        }
+      }
+      if (storedNotes) {
+        try {
+          setDeveloperNotes(JSON.parse(storedNotes));
+        } catch (e) {
+          console.error("Failed to parse developer notes:", e);
+        }
+      }
+    }
+  }, []);
+
+  const updateHandoverState = (repoId: number, state: "not_started" | "in_progress" | "prepared") => {
+    const updated = { ...handoverStates, [repoId]: state };
+    setHandoverStates(updated);
+    localStorage.setItem("secondcommit_handover_states", JSON.stringify(updated));
+  };
+
+  const updateDeveloperNotes = (repoId: number, notes: string) => {
+    const updated = { ...developerNotes, [repoId]: notes };
+    setDeveloperNotes(updated);
+    localStorage.setItem("secondcommit_developer_notes", JSON.stringify(updated));
+  };
+
   // Authenticate user on mount
   const checkAuth = async () => {
     try {
@@ -239,6 +277,10 @@ export default function Home() {
               repoId={selectedRepoId}
               onBack={() => setSelectedRepoId(null)}
               onSyncSuccess={checkAuth}
+              handoverState={handoverStates[selectedRepoId] || "not_started"}
+              developerNotes={developerNotes[selectedRepoId] || ""}
+              onStateChange={(state) => updateHandoverState(selectedRepoId, state)}
+              onNotesChange={(notes) => updateDeveloperNotes(selectedRepoId, notes)}
             />
           ) : (
             <Dashboard
