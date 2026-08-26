@@ -8,13 +8,16 @@ import {
   DormancyResponse,
   AIInsightsResponse,
 } from "@/lib/api";
+import HandoverPage from "./HandoverPage";
 
 interface RepoDetailsProps {
   repoId: number;
   onBack: () => void;
   onSyncSuccess: () => void;
   handoverState: "not_started" | "in_progress" | "prepared";
-  onPrepareHandover: () => void;
+  developerNotes: string;
+  onStateChange: (state: "not_started" | "in_progress" | "prepared") => void;
+  onNotesChange: (notes: string) => void;
 }
 
 export default function RepoDetails({
@@ -22,7 +25,9 @@ export default function RepoDetails({
   onBack,
   onSyncSuccess,
   handoverState,
-  onPrepareHandover,
+  developerNotes,
+  onStateChange,
+  onNotesChange,
 }: RepoDetailsProps) {
   const [repo, setRepo] = useState<RepositoryResponse | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -34,6 +39,7 @@ export default function RepoDetails({
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [showHandover, setShowHandover] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -131,6 +137,22 @@ export default function RepoDetails({
           </button>
         </div>
       </div>
+    );
+  }
+
+  if (showHandover && repo) {
+    return (
+      <HandoverPage
+        repo={repo}
+        health={health}
+        dormancy={dormancy}
+        aiInsights={aiInsights}
+        onBack={() => setShowHandover(false)}
+        handoverState={handoverState}
+        developerNotes={developerNotes}
+        onStateChange={onStateChange}
+        onNotesChange={onNotesChange}
+      />
     );
   }
 
@@ -411,7 +433,7 @@ export default function RepoDetails({
             ) : null}
 
             <button
-              onClick={onPrepareHandover}
+              onClick={() => setShowHandover(true)}
               className="flex items-center justify-center gap-2 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
             >
               {handoverState === "not_started" ? "Prepare Handover" : "View Handover"}
