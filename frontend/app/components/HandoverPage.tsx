@@ -92,7 +92,7 @@ export default function HandoverPage({
     fetchRepoContext();
   }, [repo.full_name]);
 
-  // Section 1: Project Overview
+  // Section 1: Project Overview cleaner
   const getProjectOverview = () => {
     if (readmeContent) {
       let cleaned = readmeContent
@@ -117,68 +117,126 @@ export default function HandoverPage({
     return "No project description or README file could be loaded. You can manually enter details in the Developer Notes below.";
   };
 
-  // Section 2: Start Here
-  const getStartHerePoints = () => {
-    const points: string[] = [];
+  // Section 2: Start Here detailed onboarding points with concise context
+  const getStartHereDetailed = () => {
+    const list: { name: string; desc: string }[] = [];
 
     if (!directoryStructure) {
-      points.push(`Primary language: ${repo.language || "Not specified"}. Look for standard project entry points.`);
-      points.push(`Default branch: Inspect branch '${repo.default_branch}' for instructions.`);
-      if (loadingStructure) {
-        points.push("Fetching directory layout from GitHub...");
-      } else {
-        points.push("Directory listing is currently unavailable (rate-limited or private repository).");
+      if (repo.language) {
+        list.push({
+          name: `${repo.language} source files`,
+          desc: `Main source codebase compiled in ${repo.language}.`
+        });
       }
-      return points;
+      list.push({
+        name: `Repository root files`,
+        desc: `Examine files on the default branch: '${repo.default_branch}'.`
+      });
+      if (loadingStructure) {
+        list.push({
+          name: "Loading layout...",
+          desc: "Scanning codebase structure from GitHub API."
+        });
+      } else {
+        list.push({
+          name: "Structure analysis limited",
+          desc: "Repository directory identified during structure analysis."
+        });
+      }
+      return list;
     }
 
     const files = directoryStructure.map((f) => f.name.toLowerCase());
     const folders = directoryStructure.filter((f) => f.type === "dir").map((f) => f.name.toLowerCase());
 
     if (files.includes("readme.md")) {
-      points.push("README.md: Found at root. Examine this file first for compilation, setup, and deployment notes.");
+      list.push({
+        name: "README.md",
+        desc: "Understand the project's purpose and setup instructions."
+      });
     }
 
-    if (folders.includes("frontend") && folders.includes("backend")) {
-      points.push("Frontend & Backend Separation: Found distinct frontend/backend environments. Verify the setup of both separate services.");
+    if (folders.includes("frontend")) {
+      list.push({
+        name: "frontend/",
+        desc: "Application interface and client-side code."
+      });
+    } else if (folders.includes("client")) {
+      list.push({
+        name: "client/",
+        desc: "Application interface and client-side code."
+      });
+    }
+
+    if (folders.includes("backend")) {
+      list.push({
+        name: "backend/",
+        desc: "API and server-side functionality."
+      });
+    } else if (folders.includes("server")) {
+      list.push({
+        name: "server/",
+        desc: "API and server-side functionality."
+      });
     }
 
     if (files.includes("package.json")) {
-      points.push("NodeJS Environment: Found package.json. Examine scripts, package configurations, and dependency lists.");
-      if (files.includes("tsconfig.json")) {
-        points.push("TypeScript Config: tsconfig.json is active. The application builds with static types.");
-      }
+      list.push({
+        name: "package.json",
+        desc: "NodeJS project settings, scripts, and runtime commands."
+      });
     }
 
-    if (files.includes("requirements.txt") || files.includes("pyproject.toml") || files.includes("pipfile")) {
-      points.push("Python Environment: Python configuration files are present in the root. Verify dependencies setup.");
+    if (files.includes("requirements.txt") || files.includes("pyproject.toml")) {
+      list.push({
+        name: "requirements.txt",
+        desc: "Python dependencies configuration file."
+      });
     }
 
     if (files.includes("go.mod")) {
-      points.push("Go Environment: Found go.mod. Compile using standard Go directives.");
+      list.push({
+        name: "go.mod",
+        desc: "Go modules configuration file."
+      });
     }
 
-    const srcFolder = directoryStructure.find((f) => f.type === "dir" && ["src", "app", "lib", "components"].includes(f.name.toLowerCase()));
-    if (srcFolder) {
-      points.push(`${srcFolder.name}/: The main codebase directory is located under /${srcFolder.name}. Look here to inspect logic.`);
+    // Source folders
+    const srcDirs = directoryStructure.filter(f => f.type === "dir" && ["src", "app", "lib", "components", "pages"].includes(f.name.toLowerCase()));
+    srcDirs.forEach(dir => {
+      if (["frontend", "backend", "client", "server"].includes(dir.name.toLowerCase())) return;
+      list.push({
+        name: `${dir.name}/`,
+        desc: "Primary source directory identified during structure analysis."
+      });
+    });
+
+    // Test folders
+    const testDirs = directoryStructure.filter(f => f.type === "dir" && ["tests", "test", "spec"].includes(f.name.toLowerCase()));
+    testDirs.forEach(dir => {
+      list.push({
+        name: `${dir.name}/`,
+        desc: "Test suite directory. Run tests to confirm local environment stability."
+      });
+    });
+
+    // Config files
+    const configFiles = directoryStructure.filter(f => f.type === "file" && (f.name.includes(".env") || f.name.includes("config")));
+    configFiles.forEach(file => {
+      list.push({
+        name: file.name,
+        desc: "Environment or project configuration file."
+      });
+    });
+
+    if (list.length === 0) {
+      list.push({
+        name: "Repository root files",
+        desc: "Inspect root directory files to locate entry scripts."
+      });
     }
 
-    const configFiles = directoryStructure.filter((f) => f.type === "file" && (f.name.includes(".env") || f.name.includes("config") || f.name.includes("setting")));
-    if (configFiles.length > 0) {
-      const names = configFiles.map((c) => c.name).join(", ");
-      points.push(`Configuration Templates: Found configuration templates (${names}). Duplicate and configure before executing.`);
-    }
-
-    const testFolder = directoryStructure.find((f) => f.type === "dir" && ["tests", "test", "spec"].includes(f.name.toLowerCase()));
-    if (testFolder) {
-      points.push(`${testFolder.name}/: Found test suite folder. Run test scripts to verify the local build environment.`);
-    }
-
-    if (points.length === 0) {
-      points.push("Inspect the root directory files to locate entry scripts.");
-    }
-
-    return points;
+    return list;
   };
 
   // Section 3: Important Areas
@@ -274,14 +332,29 @@ export default function HandoverPage({
   };
 
   const projectOverview = getProjectOverview();
-  const startHerePoints = getStartHerePoints();
+  const startHerePoints = getStartHereDetailed();
   const importantAreas = getImportantAreas();
   const knownRisks = getKnownRisks();
 
+  // Mapping states to progress indicator
+  const getStepStatus = (stepIndex: number) => {
+    if (handoverState === "not_started") {
+      if (stepIndex === 1) return "active";
+      return "pending";
+    }
+    if (handoverState === "in_progress") {
+      if (stepIndex <= 3) return "active";
+      return "pending";
+    }
+    // prepared state
+    if (stepIndex <= 3) return "complete";
+    return "active";
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-6 py-12 select-none">
-      {/* Header & Back Button */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-baseline sm:justify-between mb-10">
+      {/* 1. HANDOVER HEADER */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-baseline sm:justify-between mb-10 pb-8 border-b border-border-muted">
         <div className="flex items-baseline gap-4">
           <button
             onClick={onBack}
@@ -294,98 +367,173 @@ export default function HandoverPage({
           </button>
           <div>
             <span className="text-[10px] font-mono font-bold tracking-widest text-text-muted uppercase">SECOND COMMIT</span>
-            <div className="flex items-baseline gap-2.5 mt-1.5 font-outfit">
+            <div className="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4 mt-2 font-outfit">
               <h1 className="text-3xl text-text-primary font-extrabold tracking-tight">Repository Handover</h1>
-              <span className="text-xs text-brand-accent font-mono font-bold">/ {repo.name}</span>
+              <span className="text-sm text-brand-accent font-mono font-bold">/ {repo.name}</span>
             </div>
-            <p className="text-[10px] text-text-muted font-mono mt-1">Branch: {repo.default_branch}</p>
+            <p className="text-xs text-text-secondary font-sans mt-1">Prepared for the developer who comes next.</p>
           </div>
+        </div>
+
+        {/* Clear Status Badge */}
+        <div className="shrink-0">
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider border rounded-none ${
+            handoverState === "prepared"
+              ? "text-semantic-healthy border-semantic-healthy/25 bg-semantic-healthy/5"
+              : handoverState === "in_progress"
+              ? "text-brand-accent border-brand-accent/25 bg-brand-accent/5 animate-pulse"
+              : "text-text-muted border-border-muted bg-surface-secondary"
+          }`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${
+              handoverState === "prepared"
+                ? "bg-semantic-healthy"
+                : handoverState === "in_progress"
+                ? "bg-brand-accent"
+                : "bg-text-muted"
+            }`} />
+            {handoverState === "prepared"
+              ? "READY FOR HANDOVER"
+              : handoverState === "in_progress"
+              ? "IN PROGRESS"
+              : "NOT STARTED"}
+          </span>
         </div>
       </div>
 
-      {/* Handover Status Section */}
-      <div className="border border-border-muted bg-surface-base p-8 mb-12 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="flex-1">
-            <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">HANDOVER STATUS</span>
-            {handoverState === "not_started" && (
-              <div>
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-none border border-border-strong bg-surface-secondary text-text-secondary text-[10px] font-mono font-bold uppercase mb-4">
-                  <span className="h-1.5 w-1.5 rounded-full bg-text-muted" />
-                  Not prepared yet
-                </div>
-                <p className="text-sm text-text-secondary font-sans leading-relaxed">
-                  Prepare a structured knowledge package for the next developer taking over this repository. It derives project history and repository files automatically.
-                </p>
+      {/* 2. HANDOVER PROGRESS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-b border-border-muted mb-10 select-none">
+        {[
+          { step: "01", label: "Understand", status: getStepStatus(1) },
+          { step: "02", label: "Review", status: getStepStatus(2) },
+          { step: "03", label: "Add Context", status: getStepStatus(3) },
+          { step: "04", label: "Ready", status: getStepStatus(4) },
+        ].map((item, idx) => (
+          <div key={idx} className={`flex flex-col border-l-2 pl-4 py-1.5 ${
+            item.status === "complete"
+              ? "border-semantic-healthy text-semantic-healthy"
+              : item.status === "active"
+              ? "border-brand-accent text-text-primary font-bold"
+              : "border-border-muted text-text-muted"
+          }`}>
+            <span className="text-[9px] font-mono tracking-wider font-bold">
+              {item.step} {item.status === "complete" ? "✓" : ""}
+            </span>
+            <span className="text-xs uppercase tracking-widest font-outfit mt-1">
+              {item.label}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* 3. INCOMING DEVELOPER VIEW & HANDOVER STATUS CARD */}
+      {handoverState === "prepared" ? (
+        <div className="border border-semantic-healthy/25 bg-semantic-healthy/5 p-8 mb-10 text-left relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_100%_0%,rgba(10,108,74,0.05)_0%,transparent_70%)] pointer-events-none" />
+          <h2 className="text-xl font-outfit text-semantic-healthy font-extrabold tracking-tight mb-3">
+            READY FOR THE NEXT DEVELOPER
+          </h2>
+          <p className="text-xs text-text-secondary leading-relaxed max-w-2xl mb-5 font-sans">
+            The knowledge package has been reviewed and is ready for the incoming developer. Below is a summary of what the recipient receives:
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 text-xs font-mono text-text-primary">
+            <div className="flex items-center gap-2">
+              <span className="text-semantic-healthy select-none font-bold">✓</span> Project overview
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-semantic-healthy select-none font-bold">✓</span> Starting points
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-semantic-healthy select-none font-bold">✓</span> Important areas
+            </div>
+            {knownRisks.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-semantic-healthy select-none font-bold">✓</span> Current risks
               </div>
             )}
-            {handoverState === "in_progress" && (
-              <div>
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-none border border-brand-accent/30 bg-brand-accent/10 text-brand-accent text-[10px] font-mono font-bold uppercase mb-4 animate-pulse">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
-                  In progress
-                </div>
-                <p className="text-sm text-text-secondary font-sans leading-relaxed">
-                  You are drafting the handover guide. Add your custom context in the **Developer Notes** section below, review the parsed information, and complete the package when ready.
-                </p>
-              </div>
-            )}
-            {handoverState === "prepared" && (
-              <div>
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-none border border-semantic-healthy/30 bg-semantic-healthy/10 text-semantic-healthy text-[10px] font-mono font-bold uppercase mb-4">
-                  <span className="h-1.5 w-1.5 rounded-full bg-semantic-healthy" />
-                  Prepared & Ready
-                </div>
-                <p className="text-sm text-text-secondary font-sans leading-relaxed">
-                  Your repository handover package is ready! This package is frozen in its current state. You can share this with incoming developers or reset it to modify contents.
-                </p>
+            {developerNotes.trim() && (
+              <div className="flex items-center gap-2">
+                <span className="text-semantic-healthy select-none font-bold">✓</span> Developer notes
               </div>
             )}
           </div>
+        </div>
+      ) : (
+        <div className="border border-border-muted bg-surface-base p-8 mb-10 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="flex-1">
+              <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">HANDOVER ACTION</span>
+              {handoverState === "not_started" && (
+                <p className="text-sm text-text-secondary font-sans leading-relaxed">
+                  Prepare a structured knowledge package for the next developer who takes over this repository. It analyzes project layouts and repository files automatically.
+                </p>
+              )}
+              {handoverState === "in_progress" && (
+                <p className="text-sm text-text-secondary font-sans leading-relaxed">
+                  You are building the handover guide. Add your custom context in **From the Previous Developer** below, review the package contents, and complete the package when ready.
+                </p>
+              )}
+            </div>
 
-          <div className="flex flex-col sm:flex-row md:flex-col gap-3 justify-end shrink-0">
-            {handoverState === "not_started" && (
-              <button
-                onClick={() => onStateChange("in_progress")}
-                className="flex items-center justify-center gap-2.5 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
-              >
-                Start Handover
-              </button>
-            )}
-            {handoverState === "in_progress" && (
-              <button
-                onClick={() => onStateChange("prepared")}
-                className="flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
-              >
-                Complete Handover
-              </button>
-            )}
-            {handoverState === "prepared" && (
-              <>
+            <div className="shrink-0 flex items-center gap-3">
+              {handoverState === "not_started" && (
                 <button
                   onClick={() => onStateChange("in_progress")}
-                  className="flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+                  className="flex items-center justify-center gap-2.5 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
                 >
-                  Edit Handover
+                  Start Handover
                 </button>
+              )}
+              {handoverState === "in_progress" && (
                 <button
-                  onClick={() => {
-                    if (confirm("Are you sure you want to reset the handover? This will clear all developer notes.")) {
-                      onNotesChange("");
-                      onStateChange("not_started");
-                    }
-                  }}
-                  className="flex items-center justify-center gap-2.5 rounded-none border border-semantic-critical/20 bg-surface-base text-semantic-critical hover:bg-semantic-critical/5 px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+                  onClick={() => onStateChange("prepared")}
+                  className="flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
                 >
-                  Reset Handover
+                  Complete Handover
                 </button>
-              </>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Sections Header */}
+      {/* 6. HANDOVER CHECKLIST */}
+      {(handoverState === "in_progress" || handoverState === "prepared") && (
+        <div className="border border-border-muted bg-surface-base p-6 mb-10 shadow-sm select-none">
+          <div className="border-b border-border-muted/65 pb-3 mb-4">
+            <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-text-primary">
+              Handover Checklist
+            </h3>
+            <span className="text-[9px] text-text-muted font-sans mt-1 block">
+              Steps verified by the outgoing developer before packaging:
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              { label: "Project overview reviewed", checked: true },
+              { label: "Important areas reviewed", checked: handoverState === "prepared" || !!directoryStructure },
+              { label: "Known risks reviewed", checked: handoverState === "prepared" || (health !== null || dormancy !== null) },
+              { label: "Developer notes added", checked: handoverState === "prepared" || developerNotes.trim().length > 0 },
+              { label: "Handover ready", checked: handoverState === "prepared" },
+            ].map((item, idx) => (
+              <div key={idx} className="flex items-center gap-3 text-xs font-sans">
+                <span className={`h-4 w-4 border flex items-center justify-center font-bold text-[9px] shrink-0 ${
+                  item.checked
+                    ? "border-semantic-healthy text-semantic-healthy bg-semantic-healthy/5"
+                    : "border-border-strong text-transparent"
+                }`}>
+                  {item.checked ? "✓" : ""}
+                </span>
+                <span className={item.checked && handoverState === "prepared" ? "text-text-secondary line-through opacity-70" : "text-text-primary"}>
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Content Header */}
       <div className="mb-8 border-b border-border-muted pb-4">
         <h2 className="text-[10px] font-mono font-bold uppercase tracking-widest text-text-primary">
           {handoverState === "prepared" ? "Handover Package Contents" : "What Will Be Included"}
@@ -411,7 +559,7 @@ export default function HandoverPage({
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-xs text-text-secondary font-sans leading-relaxed whitespace-pre-line">
+              <p className="text-xs text-text-secondary font-sans leading-relaxed whitespace-pre-line select-text">
                 {projectOverview}
               </p>
               <div className="flex flex-wrap gap-4 pt-3 border-t border-border-muted/50 select-none">
@@ -440,7 +588,7 @@ export default function HandoverPage({
           )}
         </div>
 
-        {/* 2. START HERE */}
+        {/* 2. START HERE EXPERIENCE (actionable, numbered) */}
         <div className="border border-border-muted bg-surface-base p-6 rounded-none shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 border-b border-border-muted/65 pb-3 mb-4 select-none">
             <h3 className="text-sm font-outfit text-text-primary font-bold">Start Here</h3>
@@ -452,33 +600,26 @@ export default function HandoverPage({
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-xs text-text-primary font-sans">
-                Below are the recommended entry points and directories discovered in the workspace to begin onboarding:
+              <p className="text-xs text-text-secondary font-sans leading-relaxed select-none">
+                If you just inherited this repository, here is where you should look first:
               </p>
-              <ul className="space-y-2.5">
-                {startHerePoints.map((point, index) => {
-                  const parts = point.split(":");
-                  const header = parts[0];
-                  const details = parts.slice(1).join(":");
-                  return (
-                    <li key={index} className="text-xs text-text-secondary leading-relaxed font-sans flex items-start gap-2">
-                      <span className="text-brand-accent font-bold select-none mt-0.5">•</span>
-                      <span>
-                        {details ? (
-                          <>
-                            <strong className="font-mono text-text-primary text-[11px] bg-surface-secondary px-1.5 py-0.5 border border-border-muted mr-1.5 font-bold">
-                              {header}
-                            </strong>
-                            {details}
-                          </>
-                        ) : (
-                          point
-                        )}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="space-y-6">
+                {startHerePoints.map((item, index) => (
+                  <div key={index} className="flex gap-4">
+                    <span className="text-xs font-mono font-bold text-brand-accent mt-0.5 select-none">
+                      {(index + 1).toString().padStart(2, "0")}
+                    </span>
+                    <div>
+                      <strong className="text-xs font-mono text-text-primary bg-surface-secondary px-2 py-0.5 border border-border-muted select-text">
+                        {item.name}
+                      </strong>
+                      <p className="text-xs text-text-secondary mt-1.5 font-sans leading-relaxed select-text">
+                        {item.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -495,7 +636,7 @@ export default function HandoverPage({
                 <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-text-primary block mb-1">
                   {area.title}
                 </span>
-                <p className="text-[11px] text-text-secondary font-sans leading-relaxed">
+                <p className="text-[11px] text-text-secondary font-sans leading-relaxed select-text">
                   {area.description}
                 </p>
               </div>
@@ -510,7 +651,7 @@ export default function HandoverPage({
             <span className="text-[9px] font-mono tracking-wider uppercase text-text-muted">Activity Log</span>
           </div>
           <div className="space-y-3">
-            <p className="text-xs text-text-primary font-sans leading-relaxed">
+            <p className="text-xs text-text-secondary font-sans leading-relaxed">
               Development history will be available in a future handover analysis.
             </p>
             {repo.pushed_at && (
@@ -533,11 +674,11 @@ export default function HandoverPage({
           {knownRisks.length > 0 ? (
             <ul className="space-y-3">
               {knownRisks.map((risk, index) => (
-                <li key={index} className="text-xs border border-semantic-critical/20 bg-semantic-critical/5 text-text-secondary p-3 leading-relaxed font-sans flex items-start gap-2.5">
+                <li key={index} className="text-xs border border-semantic-critical/25 bg-semantic-critical/5 text-text-secondary p-3 leading-relaxed font-sans flex items-start gap-2.5">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 text-semantic-critical shrink-0 mt-0.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
-                  <span>{risk}</span>
+                  <span className="select-text">{risk}</span>
                 </li>
               ))}
             </ul>
@@ -559,7 +700,7 @@ export default function HandoverPage({
           </p>
         </div>
 
-        {/* 7. DEVELOPER NOTES */}
+        {/* 5. DEVELOPER NOTES (FROM THE PREVIOUS DEVELOPER) */}
         <div
           className={`border p-6 rounded-none transition-all duration-200 shadow-sm ${
             handoverState === "prepared"
@@ -570,7 +711,9 @@ export default function HandoverPage({
           }`}
         >
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 border-b border-border-muted/65 pb-3 mb-4 select-none">
-            <h3 className="text-sm font-outfit text-text-primary font-bold">Developer Notes</h3>
+            <h3 className="text-sm font-outfit text-text-primary font-bold">
+              {handoverState === "prepared" ? "From the Previous Developer" : "Developer Notes"}
+            </h3>
             <span className={`text-[9px] font-mono tracking-wider uppercase ${
               handoverState === "prepared"
                 ? "text-semantic-healthy"
@@ -593,20 +736,31 @@ export default function HandoverPage({
           )}
 
           {handoverState === "in_progress" && (
-            <div className="space-y-2">
-              <label htmlFor="developer-notes-input" className="text-[9px] font-mono uppercase text-text-muted tracking-wider block font-bold">
-                Project Context & Notes for the Next Developer
-              </label>
-              <textarea
-                id="developer-notes-input"
-                value={developerNotes}
-                onChange={(e) => onNotesChange(e.target.value)}
-                placeholder="Share architecture details, deployment gotchas, custom system hooks, credentials locations (avoid plain-text secrets), or team contact details..."
-                className="w-full h-36 p-3 text-xs font-sans border border-border-strong bg-surface-base text-text-primary placeholder:text-text-muted focus:border-brand-accent focus:outline-none transition-all duration-150 resize-y"
-              />
-              <span className="text-[9px] font-mono text-text-secondary block text-right">
-                {developerNotes.length} characters written (Saved locally)
-              </span>
+            <div className="space-y-4">
+              <div className="bg-surface-secondary border border-border-muted p-4 space-y-1.5 select-none">
+                <span className="text-[9px] font-mono text-text-muted uppercase font-bold block">Prompts for Context:</span>
+                <ul className="text-xs text-text-secondary space-y-1 font-sans">
+                  <li>• What were you working on?</li>
+                  <li>• What should the next developer understand first?</li>
+                  <li>• Is there anything that isn't obvious from the code?</li>
+                  <li>• What should they be careful about?</li>
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="developer-notes-input" className="text-[9px] font-mono uppercase text-text-muted tracking-wider block font-bold">
+                  Handover Notes Input
+                </label>
+                <textarea
+                  id="developer-notes-input"
+                  value={developerNotes}
+                  onChange={(e) => onNotesChange(e.target.value)}
+                  placeholder="Share details on architecture, recent WIP features, custom integrations, active branch contexts, or staging configuration gotchas..."
+                  className="w-full h-40 p-3 text-xs font-sans border border-border-strong bg-surface-base text-text-primary placeholder:text-text-muted focus:border-brand-accent focus:outline-none transition-all duration-150 resize-y"
+                />
+                <span className="text-[9px] font-mono text-text-secondary block text-right">
+                  {developerNotes.length} characters written (Saved locally)
+                </span>
+              </div>
             </div>
           )}
 
@@ -614,7 +768,7 @@ export default function HandoverPage({
             <div className="border border-semantic-healthy/20 bg-semantic-healthy/5 p-5">
               <span className="text-[9px] font-mono uppercase text-semantic-healthy tracking-wider block mb-2 font-bold select-none">OUTGOING DEVELOPER NOTES</span>
               {developerNotes.trim() ? (
-                <div className="text-xs font-mono text-text-primary leading-relaxed whitespace-pre-wrap">
+                <div className="text-xs font-mono text-text-primary leading-relaxed whitespace-pre-wrap select-text">
                   {developerNotes}
                 </div>
               ) : (
@@ -625,7 +779,55 @@ export default function HandoverPage({
             </div>
           )}
         </div>
+
+        {/* 7. NEXT DEVELOPER SECTION (FOR THE NEXT DEVELOPER) */}
+        {handoverState === "prepared" && (
+          <div className="border border-border-muted bg-surface-secondary/40 p-6 rounded-none shadow-sm">
+            <div className="border-b border-border-muted/65 pb-3 mb-4 select-none">
+              <h3 className="text-sm font-outfit text-text-primary font-bold">For the Next Developer</h3>
+              <span className="text-[9px] font-mono tracking-wider uppercase text-text-muted">Onboarding Path</span>
+            </div>
+            <div className="space-y-3.5">
+              {[
+                "Read the project overview.",
+                "Review the Start Here files.",
+                "Review current risks.",
+                "Read the previous developer's notes.",
+                "Run the project locally.",
+                "Make your first change.",
+              ].map((step, idx) => (
+                <div key={idx} className="flex gap-3 text-xs leading-relaxed font-sans text-text-secondary">
+                  <span className="font-mono text-brand-accent font-bold select-none">{idx + 1}.</span>
+                  <span className="select-text">{step}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Prepare/Edit controls at the bottom for Prepared state */}
+      {handoverState === "prepared" && (
+        <div className="mt-12 pt-6 border-t border-border-muted flex gap-4 select-none">
+          <button
+            onClick={() => onStateChange("in_progress")}
+            className="flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+          >
+            Edit Handover
+          </button>
+          <button
+            onClick={() => {
+              if (confirm("Are you sure you want to reset the handover? This will clear all developer notes.")) {
+                onNotesChange("");
+                onStateChange("not_started");
+              }
+            }}
+            className="flex items-center justify-center gap-2.5 rounded-none border border-semantic-critical/20 bg-surface-base text-semantic-critical hover:bg-semantic-critical/5 px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+          >
+            Reset Handover
+          </button>
+        </div>
+      )}
     </div>
   );
 }
