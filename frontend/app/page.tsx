@@ -6,6 +6,7 @@ import Navbar from "./components/Navbar";
 import Dashboard from "./components/Dashboard";
 import RepoDetails from "./components/RepoDetails";
 import ImportModal from "./components/ImportModal";
+import HandoverPage from "./components/HandoverPage";
 
 export default function Home() {
   const [user, setUser] = useState<UserSummary | null>(null);
@@ -16,6 +17,45 @@ export default function Home() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Local handover states
+  const [handoverStates, setHandoverStates] = useState<Record<number, "not_started" | "in_progress" | "prepared">>({});
+  const [developerNotes, setDeveloperNotes] = useState<Record<number, string>>({});
+  const [viewingHandoverRepoId, setViewingHandoverRepoId] = useState<number | null>(null);
+
+  // Load handover state from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedStates = localStorage.getItem("secondcommit_handover_states");
+      const storedNotes = localStorage.getItem("secondcommit_developer_notes");
+      if (storedStates) {
+        try {
+          setHandoverStates(JSON.parse(storedStates));
+        } catch (e) {
+          console.error("Failed to parse handover states:", e);
+        }
+      }
+      if (storedNotes) {
+        try {
+          setDeveloperNotes(JSON.parse(storedNotes));
+        } catch (e) {
+          console.error("Failed to parse developer notes:", e);
+        }
+      }
+    }
+  }, []);
+
+  const updateHandoverState = (repoId: number, state: "not_started" | "in_progress" | "prepared") => {
+    const updated = { ...handoverStates, [repoId]: state };
+    setHandoverStates(updated);
+    localStorage.setItem("secondcommit_handover_states", JSON.stringify(updated));
+  };
+
+  const updateDeveloperNotes = (repoId: number, notes: string) => {
+    const updated = { ...developerNotes, [repoId]: notes };
+    setDeveloperNotes(updated);
+    localStorage.setItem("secondcommit_developer_notes", JSON.stringify(updated));
+  };
 
   // Authenticate user on mount
   const checkAuth = async () => {
@@ -228,6 +268,7 @@ export default function Home() {
         setActiveTab={(tab: "dashboard" | "analytics") => {
           setActiveTab(tab);
           setSelectedRepoId(null); // Clear selected repo when switching tabs
+          setViewingHandoverRepoId(null);
         }}
         onLogout={handleLogout}
       />
@@ -235,11 +276,24 @@ export default function Home() {
       <main className="flex-1">
         {activeTab === "dashboard" ? (
           selectedRepoId !== null ? (
-            <RepoDetails
-              repoId={selectedRepoId}
-              onBack={() => setSelectedRepoId(null)}
-              onSyncSuccess={checkAuth}
-            />
+            viewingHandoverRepoId !== null ? (
+              <HandoverPage
+                repo={repos.find((r) => r.id === viewingHandoverRepoId)!}
+                onBack={() => setViewingHandoverRepoId(null)}
+                handoverState={handoverStates[viewingHandoverRepoId] || "not_started"}
+                developerNotes={developerNotes[viewingHandoverRepoId] || ""}
+                onStateChange={(state) => updateHandoverState(viewingHandoverRepoId, state)}
+                onNotesChange={(notes) => updateDeveloperNotes(viewingHandoverRepoId, notes)}
+              />
+            ) : (
+              <RepoDetails
+                repoId={selectedRepoId}
+                onBack={() => setSelectedRepoId(null)}
+                onSyncSuccess={checkAuth}
+                handoverState={handoverStates[selectedRepoId] || "not_started"}
+                onPrepareHandover={() => setViewingHandoverRepoId(selectedRepoId)}
+              />
+            )
           ) : (
             <Dashboard
               user={user}

@@ -13,9 +13,17 @@ interface RepoDetailsProps {
   repoId: number;
   onBack: () => void;
   onSyncSuccess: () => void;
+  handoverState: "not_started" | "in_progress" | "prepared";
+  onPrepareHandover: () => void;
 }
 
-export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetailsProps) {
+export default function RepoDetails({
+  repoId,
+  onBack,
+  onSyncSuccess,
+  handoverState,
+  onPrepareHandover,
+}: RepoDetailsProps) {
   const [repo, setRepo] = useState<RepositoryResponse | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [dormancy, setDormancy] = useState<DormancyResponse | null>(null);
@@ -372,6 +380,45 @@ export default function RepoDetails({ repoId, onBack, onSyncSuccess }: RepoDetai
           </div>
         </div>
       )}
+
+      {/* Handover Card */}
+      <div className="border border-border-muted bg-surface-base p-8 mb-10 shadow-sm relative overflow-hidden select-none mt-10">
+        {/* Subtle background decoration to emphasize the feature */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_100%_0%,rgba(232,121,42,0.04)_0%,transparent_70%)] pointer-events-none" />
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative z-10">
+          <div className="flex-1">
+            <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-2">HANDOVER</span>
+            <h3 className="text-lg font-outfit text-text-primary font-bold mb-2">
+              Prepare this repository for the next developer.
+            </h3>
+            <p className="text-xs text-text-secondary font-sans leading-relaxed max-w-2xl">
+              Create a structured handover that explains the project, important areas, current state, and things the next developer should know.
+            </p>
+          </div>
+
+          <div className="shrink-0 flex items-center gap-3">
+            {handoverState === "prepared" ? (
+              <div className="flex items-center gap-2 text-semantic-healthy font-mono text-[10px] uppercase font-bold border border-semantic-healthy/20 bg-semantic-healthy/5 px-3 py-1.5 rounded-none">
+                <span className="h-1.5 w-1.5 rounded-full bg-semantic-healthy" />
+                Prepared
+              </div>
+            ) : handoverState === "in_progress" ? (
+              <div className="flex items-center gap-2 text-brand-accent font-mono text-[10px] uppercase font-bold border border-brand-accent/20 bg-brand-accent/5 px-3 py-1.5 rounded-none animate-pulse">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
+                In Progress
+              </div>
+            ) : null}
+
+            <button
+              onClick={onPrepareHandover}
+              className="flex items-center justify-center gap-2 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+            >
+              {handoverState === "not_started" ? "Prepare Handover" : "View Handover"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
