@@ -330,9 +330,7 @@ Additional states include:
 
 The status represents the revival state on SecondCommit and does not automatically represent the GitHub repository state.
 
----
-
-##  Revival Roadmap
+-Project Revival Roadmap
 
 A project can contain a structured revival roadmap.
 
@@ -510,18 +508,18 @@ second-commit/
 
 ### Phase 1: Project Foundation
 
-- [ ] Initialize Next.js frontend
-- [ ] Initialize FastAPI backend
-- [ ] Configure PostgreSQL
-- [ ] Configure environment variables
-- [ ] Establish frontend-backend communication
-- [ ] Create initial database configuration
+- [x] Initialize Next.js frontend
+- [x] Initialize FastAPI backend
+- [x] Configure PostgreSQL
+- [x] Configure environment variables
+- [x] Establish frontend-backend communication
+- [x] Create initial database configuration
 
 ### Phase 2: GitHub Authentication
 
-- [ ] Create GitHub OAuth application
-- [ ] Implement GitHub login
-- [ ] Handle OAuth callback
+- [x] Create GitHub OAuth application
+- [x] Implement GitHub login
+- [x] Handle OAuth callback
 - [ ] Create users from GitHub identity
 - [ ] Implement authenticated sessions
 - [ ] Create basic user profile
