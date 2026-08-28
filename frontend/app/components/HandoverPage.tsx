@@ -17,9 +17,11 @@ interface HandoverPageProps {
   handoverState: "not_started" | "in_progress" | "prepared";
   developerNotes: string;
   revivalIntent: string;
+  publicationState: "unpublished" | "published";
   onStateChange: (state: "not_started" | "in_progress" | "prepared") => void;
   onNotesChange: (notes: string) => void;
   onRevivalIntentChange: (intent: string) => void;
+  onPublicationStateChange: (status: "unpublished" | "published") => void;
 }
 
 interface GithubContentItem {
@@ -88,9 +90,11 @@ export default function HandoverPage({
   handoverState,
   developerNotes,
   revivalIntent,
+  publicationState,
   onStateChange,
   onNotesChange,
   onRevivalIntentChange,
+  onPublicationStateChange,
 }: HandoverPageProps) {
   const [readmeContent, setReadmeContent] = useState<string | null>(null);
   const [directoryStructure, setDirectoryStructure] = useState<GithubContentItem[] | null>(null);
@@ -478,8 +482,14 @@ export default function HandoverPage({
           </div>
         </div>
 
-        {/* Clear Status Badge */}
-        <div className="shrink-0">
+        {/* Clear Status Badges */}
+        <div className="shrink-0 flex items-center gap-2">
+          {publicationState === "published" && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider border border-brand-accent/25 bg-brand-accent/5 text-brand-accent select-none">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-accent animate-pulse" />
+              PUBLISHED
+            </span>
+          )}
           <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider border rounded-none ${
             handoverState === "prepared"
               ? "text-semantic-healthy border-semantic-healthy/25 bg-semantic-healthy/5"
@@ -530,91 +540,190 @@ export default function HandoverPage({
 
       {/* 3. INCOMING DEVELOPER VIEW & HANDOVER STATUS CARD */}
       {handoverState === "prepared" ? (
-        <div className="border border-semantic-healthy/25 bg-semantic-healthy/5 p-8 mb-10 text-left relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_100%_0%,rgba(10,108,74,0.05)_0%,transparent_70%)] pointer-events-none" />
-          <h2 className="text-xl font-outfit text-semantic-healthy font-extrabold tracking-tight mb-3">
-            READY FOR THE NEXT DEVELOPER
-          </h2>
-          <p className="text-xs text-text-secondary leading-relaxed max-w-2xl mb-5 font-sans">
-            The knowledge package has been reviewed and is ready for the incoming developer. Below is a summary of what the recipient receives:
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2 text-xs font-mono text-text-primary">
-            <div className="flex items-center gap-2">
-              <span className="text-semantic-healthy select-none font-bold">✓</span> Project overview
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-semantic-healthy select-none font-bold">✓</span> Starting points
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-semantic-healthy select-none font-bold">✓</span> Important areas
-            </div>
-            {knownRisks.length > 0 && (
+        <div className="space-y-6 mb-10">
+          {/* READY FOR THE NEXT DEVELOPER BANNER */}
+          <div className="border border-semantic-healthy/25 bg-semantic-healthy/5 p-8 text-left relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_100%_0%,rgba(10,108,74,0.05)_0%,transparent_70%)] pointer-events-none" />
+            <h2 className="text-xl font-outfit text-semantic-healthy font-extrabold tracking-tight mb-3">
+              READY FOR THE NEXT DEVELOPER
+            </h2>
+            <p className="text-xs text-text-secondary leading-relaxed max-w-2xl mb-5 font-sans">
+              The knowledge package has been reviewed and is ready for the incoming developer. Below is a summary of what the recipient receives:
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2 text-xs font-mono text-text-primary">
               <div className="flex items-center gap-2">
-                <span className="text-semantic-healthy select-none font-bold">✓</span> Current risks
+                <span className="text-semantic-healthy select-none font-bold">✓</span> Project overview
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-semantic-healthy select-none font-bold">✓</span> Starting points
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-semantic-healthy select-none font-bold">✓</span> Important areas
+              </div>
+              {knownRisks.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-semantic-healthy select-none font-bold">✓</span> Current risks
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-semantic-healthy select-none font-bold">✓</span> Revival Intent: {REVIVAL_INTENT_OPTIONS.find(o => o.key === revivalIntent)?.title || "Selected"}
+              </div>
+              {developerNotes.trim() && (
+                <div className="flex items-center gap-2">
+                  <span className="text-semantic-healthy select-none font-bold">✓</span> Developer notes
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* PROJECT VISIBILITY CARD */}
+          <div className="border border-border-strong bg-surface-base p-8 shadow-sm">
+            {validationError && (
+              <div className="mb-6 p-4 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-sans text-xs flex items-start gap-2.5 animate-fade-in">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 shrink-0 mt-0.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <strong className="font-outfit block text-xs mb-0.5 font-bold">Publication Error</strong>
+                  <span>{validationError}</span>
+                </div>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <span className="text-semantic-healthy select-none font-bold">✓</span> Revival Intent: {REVIVAL_INTENT_OPTIONS.find(o => o.key === revivalIntent)?.title || "Selected"}
-            </div>
-            {developerNotes.trim() && (
-              <div className="flex items-center gap-2">
-                <span className="text-semantic-healthy select-none font-bold">✓</span> Developer notes
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="flex-1">
+                <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">PROJECT VISIBILITY</span>
+                <h3 className="text-base font-outfit text-text-primary font-bold mb-1">
+                  Make this project available for another developer to discover.
+                </h3>
+                {publicationState === "published" ? (
+                  <p className="text-xs text-text-secondary font-sans leading-relaxed">
+                    This project is now marked as available for revival. Other developers on SecondCommit will be able to search and view its handover context.
+                  </p>
+                ) : (
+                  <p className="text-xs text-text-secondary font-sans leading-relaxed">
+                    This project is currently hidden. Publish the project to allow the community to discover it.
+                  </p>
+                )}
               </div>
-            )}
+
+              <div className="shrink-0 flex flex-wrap items-center gap-6">
+                <div className="flex flex-col items-start md:items-end">
+                  <span className="text-[8px] font-mono text-text-muted uppercase block font-bold">Status</span>
+                  <span className={`text-xs font-mono font-bold uppercase mt-1 ${
+                    publicationState === "published" ? "text-semantic-healthy" : "text-text-muted"
+                  }`}>
+                    {publicationState === "published" ? "● PUBLISHED" : "○ NOT PUBLISHED"}
+                  </span>
+                </div>
+
+                {publicationState === "published" ? (
+                  <button
+                    onClick={() => onPublicationStateChange("unpublished")}
+                    className="flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm"
+                  >
+                    Unpublish Project
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (!revivalIntent) {
+                        setValidationError("Revival Intent must be selected before publishing the project.");
+                      } else {
+                        setValidationError(null);
+                        onPublicationStateChange("published");
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm hover:shadow-md"
+                  >
+                    Publish Project
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       ) : (
-        <div className="border border-border-muted bg-surface-base p-8 mb-10 shadow-sm">
-          {validationError && (
-            <div className="mb-6 p-4 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-sans text-xs flex items-start gap-2.5 animate-fade-in">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 shrink-0 mt-0.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div>
-                <strong className="font-outfit block text-xs mb-0.5 font-bold">Handoff Validation Alert</strong>
-                <span>{validationError}</span>
+        <div className="space-y-6 mb-10">
+          {/* HANDOVER ACTION CARD */}
+          <div className="border border-border-muted bg-surface-base p-8 shadow-sm">
+            {validationError && (
+              <div className="mb-6 p-4 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-sans text-xs flex items-start gap-2.5 animate-fade-in">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 shrink-0 mt-0.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <strong className="font-outfit block text-xs mb-0.5 font-bold">Handoff Validation Alert</strong>
+                  <span>{validationError}</span>
+                </div>
+              </div>
+            )}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="flex-1">
+                <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">HANDOVER ACTION</span>
+                {handoverState === "not_started" && (
+                  <p className="text-sm text-text-secondary font-sans leading-relaxed">
+                    Prepare a structured knowledge package for the next developer who takes over this repository. It analyzes project layouts and repository files automatically.
+                  </p>
+                )}
+                {handoverState === "in_progress" && (
+                  <p className="text-sm text-text-secondary font-sans leading-relaxed">
+                    You are building the handover guide. Select a **Revival Intent** below, add your custom context in **From the Previous Developer**, and complete the package when ready.
+                  </p>
+                )}
+              </div>
+
+              <div className="shrink-0 flex items-center gap-3">
+                {handoverState === "not_started" && (
+                  <button
+                    onClick={() => onStateChange("in_progress")}
+                    className="flex items-center justify-center gap-2.5 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+                  >
+                    Start Handover
+                  </button>
+                )}
+                {handoverState === "in_progress" && (
+                  <button
+                    onClick={() => {
+                      if (!revivalIntent) {
+                        setValidationError("Please select a Revival Intent for this project before completing the handover.");
+                      } else {
+                        setValidationError(null);
+                        onStateChange("prepared");
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+                  >
+                    Complete Handover
+                  </button>
+                )}
               </div>
             </div>
-          )}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div className="flex-1">
-              <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">HANDOVER ACTION</span>
-              {handoverState === "not_started" && (
-                <p className="text-sm text-text-secondary font-sans leading-relaxed">
-                  Prepare a structured knowledge package for the next developer who takes over this repository. It analyzes project layouts and repository files automatically.
-                </p>
-              )}
-              {handoverState === "in_progress" && (
-                <p className="text-sm text-text-secondary font-sans leading-relaxed">
-                  You are building the handover guide. Select a **Revival Intent** below, add your custom context in **From the Previous Developer**, and complete the package when ready.
-                </p>
-              )}
-            </div>
+          </div>
 
-            <div className="shrink-0 flex items-center gap-3">
-              {handoverState === "not_started" && (
+          {/* PROJECT VISIBILITY CARD (DISABLED DURING INITIAL EDITS) */}
+          <div className="border border-border-muted bg-surface-secondary/40 p-8 shadow-sm opacity-60">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 select-none">
+              <div className="flex-1">
+                <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">PROJECT VISIBILITY</span>
+                <h3 className="text-base font-outfit text-text-primary font-bold mb-1">
+                  Make this project available for another developer to discover.
+                </h3>
+                <p className="text-xs text-text-secondary font-sans leading-relaxed">
+                  This project cannot be published because the handover context has not been prepared yet. Complete the handover details first.
+                </p>
+              </div>
+              <div className="shrink-0 flex items-center gap-6">
+                <div className="flex flex-col items-start md:items-end">
+                  <span className="text-[8px] font-mono text-text-muted uppercase block font-bold">Status</span>
+                  <span className="text-xs font-mono font-bold text-text-muted uppercase mt-1">○ NOT PUBLISHED</span>
+                </div>
                 <button
-                  onClick={() => onStateChange("in_progress")}
-                  className="flex items-center justify-center gap-2.5 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+                  disabled
+                  className="flex items-center justify-center gap-2.5 rounded-none border border-border-muted bg-surface-secondary/20 text-text-muted px-5 py-3 text-[10px] font-mono uppercase tracking-widest cursor-not-allowed outline-none"
                 >
-                  Start Handover
+                  Publish Project
                 </button>
-              )}
-              {handoverState === "in_progress" && (
-                <button
-                  onClick={() => {
-                    if (!revivalIntent) {
-                      setValidationError("Please select a Revival Intent for this project before completing the handover.");
-                    } else {
-                      setValidationError(null);
-                      onStateChange("prepared");
-                    }
-                  }}
-                  className="flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
-                >
-                  Complete Handover
-                </button>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -1128,25 +1237,33 @@ export default function HandoverPage({
 
       {/* Prepare/Edit controls at the bottom for Prepared state */}
       {handoverState === "prepared" && (
-        <div className="mt-12 pt-6 border-t border-border-muted flex gap-4 select-none">
-          <button
-            onClick={() => onStateChange("in_progress")}
-            className="flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
-          >
-            Edit Handover
-          </button>
-          <button
-            onClick={() => {
-              if (confirm("Are you sure you want to reset the handover? This will clear all developer notes and the revival intent.")) {
-                onNotesChange("");
-                onRevivalIntentChange("");
-                onStateChange("not_started");
-              }
-            }}
-            className="flex items-center justify-center gap-2.5 rounded-none border border-semantic-critical/20 bg-surface-base text-semantic-critical hover:bg-semantic-critical/5 px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
-          >
-            Reset Handover
-          </button>
+        <div className="mt-12 pt-6 border-t border-border-muted flex flex-col gap-3 select-none">
+          {publicationState === "published" && (
+            <p className="text-xs text-brand-accent font-sans italic">
+              * Note: Selecting "Edit Handover" will automatically unpublish this project until it is prepared again.
+            </p>
+          )}
+          <div className="flex gap-4">
+            <button
+              onClick={() => onStateChange("in_progress")}
+              className="flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+            >
+              Edit Handover
+            </button>
+            <button
+              onClick={() => {
+                if (confirm("Are you sure you want to reset the handover? This will clear all developer notes and the revival intent.")) {
+                  onNotesChange("");
+                  onRevivalIntentChange("");
+                  onPublicationStateChange("unpublished");
+                  onStateChange("not_started");
+                }
+              }}
+              className="flex items-center justify-center gap-2.5 rounded-none border border-semantic-critical/20 bg-surface-base text-semantic-critical hover:bg-semantic-critical/5 px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+            >
+              Reset Handover
+            </button>
+          </div>
         </div>
       )}
     </div>

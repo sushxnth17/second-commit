@@ -21,6 +21,7 @@ export default function Home() {
   const [handoverStates, setHandoverStates] = useState<Record<number, "not_started" | "in_progress" | "prepared">>({});
   const [developerNotes, setDeveloperNotes] = useState<Record<number, string>>({});
   const [revivalIntents, setRevivalIntents] = useState<Record<number, string>>({});
+  const [publicationStates, setPublicationStates] = useState<Record<number, "unpublished" | "published">>({});
 
   // Load handover state from localStorage on mount
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function Home() {
       const storedStates = localStorage.getItem("secondcommit_handover_states");
       const storedNotes = localStorage.getItem("secondcommit_developer_notes");
       const storedIntents = localStorage.getItem("secondcommit_revival_intents");
+      const storedPublications = localStorage.getItem("secondcommit_publication_states");
       if (storedStates) {
         try {
           setHandoverStates(JSON.parse(storedStates));
@@ -49,6 +51,13 @@ export default function Home() {
           console.error("Failed to parse revival intents:", e);
         }
       }
+      if (storedPublications) {
+        try {
+          setPublicationStates(JSON.parse(storedPublications));
+        } catch (e) {
+          console.error("Failed to parse publication states:", e);
+        }
+      }
     }
   }, []);
 
@@ -56,6 +65,15 @@ export default function Home() {
     const updated = { ...handoverStates, [repoId]: state };
     setHandoverStates(updated);
     localStorage.setItem("secondcommit_handover_states", JSON.stringify(updated));
+
+    // When editing (state === in_progress), set publication state back to unpublished
+    if (state === "in_progress") {
+      setPublicationStates((prev) => {
+        const next = { ...prev, [repoId]: "unpublished" as const };
+        localStorage.setItem("secondcommit_publication_states", JSON.stringify(next));
+        return next;
+      });
+    }
   };
 
   const updateDeveloperNotes = (repoId: number, notes: string) => {
@@ -68,6 +86,12 @@ export default function Home() {
     const updated = { ...revivalIntents, [repoId]: intent };
     setRevivalIntents(updated);
     localStorage.setItem("secondcommit_revival_intents", JSON.stringify(updated));
+  };
+
+  const updatePublicationState = (repoId: number, status: "unpublished" | "published") => {
+    const updated = { ...publicationStates, [repoId]: status };
+    setPublicationStates(updated);
+    localStorage.setItem("secondcommit_publication_states", JSON.stringify(updated));
   };
 
   // Authenticate user on mount
@@ -295,9 +319,11 @@ export default function Home() {
               handoverState={handoverStates[selectedRepoId] || "not_started"}
               developerNotes={developerNotes[selectedRepoId] || ""}
               revivalIntent={revivalIntents[selectedRepoId] || ""}
+              publicationState={publicationStates[selectedRepoId] || "unpublished"}
               onStateChange={(state) => updateHandoverState(selectedRepoId, state)}
               onNotesChange={(notes) => updateDeveloperNotes(selectedRepoId, notes)}
               onRevivalIntentChange={(intent) => updateRevivalIntent(selectedRepoId, intent)}
+              onPublicationStateChange={(status) => updatePublicationState(selectedRepoId, status)}
             />
           ) : (
             <Dashboard
