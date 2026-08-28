@@ -16,8 +16,10 @@ interface RepoDetailsProps {
   onSyncSuccess: () => void;
   handoverState: "not_started" | "in_progress" | "prepared";
   developerNotes: string;
+  revivalIntent: string;
   onStateChange: (state: "not_started" | "in_progress" | "prepared") => void;
   onNotesChange: (notes: string) => void;
+  onRevivalIntentChange: (intent: string) => void;
 }
 
 export default function RepoDetails({
@@ -26,8 +28,10 @@ export default function RepoDetails({
   onSyncSuccess,
   handoverState,
   developerNotes,
+  revivalIntent,
   onStateChange,
   onNotesChange,
+  onRevivalIntentChange,
 }: RepoDetailsProps) {
   const [repo, setRepo] = useState<RepositoryResponse | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -150,8 +154,10 @@ export default function RepoDetails({
         onBack={() => setShowHandover(false)}
         handoverState={handoverState}
         developerNotes={developerNotes}
+        revivalIntent={revivalIntent}
         onStateChange={onStateChange}
         onNotesChange={onNotesChange}
+        onRevivalIntentChange={onRevivalIntentChange}
       />
     );
   }

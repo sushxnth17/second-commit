@@ -20,12 +20,14 @@ export default function Home() {
   // Local handover states
   const [handoverStates, setHandoverStates] = useState<Record<number, "not_started" | "in_progress" | "prepared">>({});
   const [developerNotes, setDeveloperNotes] = useState<Record<number, string>>({});
+  const [revivalIntents, setRevivalIntents] = useState<Record<number, string>>({});
 
   // Load handover state from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedStates = localStorage.getItem("secondcommit_handover_states");
       const storedNotes = localStorage.getItem("secondcommit_developer_notes");
+      const storedIntents = localStorage.getItem("secondcommit_revival_intents");
       if (storedStates) {
         try {
           setHandoverStates(JSON.parse(storedStates));
@@ -38,6 +40,13 @@ export default function Home() {
           setDeveloperNotes(JSON.parse(storedNotes));
         } catch (e) {
           console.error("Failed to parse developer notes:", e);
+        }
+      }
+      if (storedIntents) {
+        try {
+          setRevivalIntents(JSON.parse(storedIntents));
+        } catch (e) {
+          console.error("Failed to parse revival intents:", e);
         }
       }
     }
@@ -53,6 +62,12 @@ export default function Home() {
     const updated = { ...developerNotes, [repoId]: notes };
     setDeveloperNotes(updated);
     localStorage.setItem("secondcommit_developer_notes", JSON.stringify(updated));
+  };
+
+  const updateRevivalIntent = (repoId: number, intent: string) => {
+    const updated = { ...revivalIntents, [repoId]: intent };
+    setRevivalIntents(updated);
+    localStorage.setItem("secondcommit_revival_intents", JSON.stringify(updated));
   };
 
   // Authenticate user on mount
@@ -279,8 +294,10 @@ export default function Home() {
               onSyncSuccess={checkAuth}
               handoverState={handoverStates[selectedRepoId] || "not_started"}
               developerNotes={developerNotes[selectedRepoId] || ""}
+              revivalIntent={revivalIntents[selectedRepoId] || ""}
               onStateChange={(state) => updateHandoverState(selectedRepoId, state)}
               onNotesChange={(notes) => updateDeveloperNotes(selectedRepoId, notes)}
+              onRevivalIntentChange={(intent) => updateRevivalIntent(selectedRepoId, intent)}
             />
           ) : (
             <Dashboard

@@ -16,8 +16,10 @@ interface HandoverPageProps {
   onBack: () => void;
   handoverState: "not_started" | "in_progress" | "prepared";
   developerNotes: string;
+  revivalIntent: string;
   onStateChange: (state: "not_started" | "in_progress" | "prepared") => void;
   onNotesChange: (notes: string) => void;
+  onRevivalIntentChange: (intent: string) => void;
 }
 
 interface GithubContentItem {
@@ -49,6 +51,34 @@ const RenderHonestyBadge = ({ state }: { state: "confirmed" | "signal" | "unavai
   }
 };
 
+const REVIVAL_INTENT_OPTIONS = [
+  {
+    key: "looking_for_maintainer",
+    title: "Looking for a maintainer",
+    description: "Someone who can take primary responsibility for continuing the project."
+  },
+  {
+    key: "looking_for_contributors",
+    title: "Looking for contributors",
+    description: "The owner wants other developers to contribute while retaining ownership."
+  },
+  {
+    key: "looking_for_collaborator",
+    title: "Looking for a collaborator",
+    description: "The owner wants to work together with another developer."
+  },
+  {
+    key: "take_over",
+    title: "Looking for someone to take over",
+    description: "The owner is open to another developer taking over the project's future direction."
+  },
+  {
+    key: "future_revival",
+    title: "Preserving for future revival",
+    description: "The owner is not actively looking for someone right now, but wants the project's context preserved for future revival."
+  }
+];
+
 export default function HandoverPage({
   repo,
   health,
@@ -57,13 +87,16 @@ export default function HandoverPage({
   onBack,
   handoverState,
   developerNotes,
+  revivalIntent,
   onStateChange,
   onNotesChange,
+  onRevivalIntentChange,
 }: HandoverPageProps) {
   const [readmeContent, setReadmeContent] = useState<string | null>(null);
   const [directoryStructure, setDirectoryStructure] = useState<GithubContentItem[] | null>(null);
   const [loadingReadme, setLoadingReadme] = useState(false);
   const [loadingStructure, setLoadingStructure] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Fetch README and file listings on mount or repo change
   useEffect(() => {
@@ -520,6 +553,9 @@ export default function HandoverPage({
                 <span className="text-semantic-healthy select-none font-bold">✓</span> Current risks
               </div>
             )}
+            <div className="flex items-center gap-2">
+              <span className="text-semantic-healthy select-none font-bold">✓</span> Revival Intent: {REVIVAL_INTENT_OPTIONS.find(o => o.key === revivalIntent)?.title || "Selected"}
+            </div>
             {developerNotes.trim() && (
               <div className="flex items-center gap-2">
                 <span className="text-semantic-healthy select-none font-bold">✓</span> Developer notes
@@ -529,6 +565,17 @@ export default function HandoverPage({
         </div>
       ) : (
         <div className="border border-border-muted bg-surface-base p-8 mb-10 shadow-sm">
+          {validationError && (
+            <div className="mb-6 p-4 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-sans text-xs flex items-start gap-2.5 animate-fade-in">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 shrink-0 mt-0.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <strong className="font-outfit block text-xs mb-0.5 font-bold">Handoff Validation Alert</strong>
+                <span>{validationError}</span>
+              </div>
+            </div>
+          )}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex-1">
               <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">HANDOVER ACTION</span>
@@ -539,7 +586,7 @@ export default function HandoverPage({
               )}
               {handoverState === "in_progress" && (
                 <p className="text-sm text-text-secondary font-sans leading-relaxed">
-                  You are building the handover guide. Add your custom context in **From the Previous Developer** below, review the package contents, and complete the package when ready.
+                  You are building the handover guide. Select a **Revival Intent** below, add your custom context in **From the Previous Developer**, and complete the package when ready.
                 </p>
               )}
             </div>
@@ -555,7 +602,14 @@ export default function HandoverPage({
               )}
               {handoverState === "in_progress" && (
                 <button
-                  onClick={() => onStateChange("prepared")}
+                  onClick={() => {
+                    if (!revivalIntent) {
+                      setValidationError("Please select a Revival Intent for this project before completing the handover.");
+                    } else {
+                      setValidationError(null);
+                      onStateChange("prepared");
+                    }
+                  }}
                   className="flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
                 >
                   Complete Handover
@@ -583,6 +637,7 @@ export default function HandoverPage({
               { label: "Project overview reviewed", checked: true },
               { label: "Important areas reviewed", checked: handoverState === "prepared" || !!directoryStructure },
               { label: "Known risks reviewed", checked: handoverState === "prepared" || (health !== null || dormancy !== null) },
+              { label: "Revival Intent selected", checked: handoverState === "prepared" || !!revivalIntent },
               { label: "Developer notes added", checked: handoverState === "prepared" || developerNotes.trim().length > 0 },
               { label: "Handover ready", checked: handoverState === "prepared" },
             ].map((item, idx) => (
@@ -861,7 +916,95 @@ export default function HandoverPage({
           </div>
         </div>
 
-        {/* 7. DEVELOPER NOTES */}
+        {/* 7. REVIVAL INTENT */}
+        <div
+          className={`border p-6 rounded-none transition-all duration-200 shadow-sm ${
+            handoverState === "prepared"
+              ? "border-semantic-healthy/20 bg-surface-base"
+              : handoverState === "in_progress"
+              ? "border-brand-accent/30 bg-surface-base"
+              : "border-dashed border-border-strong bg-surface-secondary/20"
+          }`}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 border-b border-border-muted/65 pb-3 mb-4 select-none">
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-sm font-outfit text-text-primary font-bold">Revival Intent</h3>
+              <RenderHonestyBadge state="confirmed" />
+            </div>
+            <span className={`text-[9px] font-mono tracking-wider uppercase ${
+              handoverState === "prepared"
+                ? "text-semantic-healthy"
+                : handoverState === "in_progress"
+                ? "text-brand-accent"
+                : "text-text-muted"
+            }`}>
+              {handoverState === "prepared" ? "Saved" : handoverState === "in_progress" ? "Interactive" : "Manual additions"}
+            </span>
+          </div>
+
+          <p className="text-xs text-text-secondary font-sans leading-relaxed mb-4">
+            Tell the next developer what you want to happen with this project. This selected intent will be presented clearly to any incoming developers.
+          </p>
+
+          {handoverState === "not_started" && (
+            <div className="border border-border-muted bg-surface-secondary p-4 text-center select-none">
+              <p className="text-xs text-text-muted font-mono uppercase">Start Handover to select revival intent</p>
+            </div>
+          )}
+
+          {handoverState === "in_progress" && (
+            <div className="space-y-3">
+              <span className="text-[9px] font-mono uppercase text-text-muted tracking-wider block font-bold select-none">Select One Option:</span>
+              <div className="grid gap-3 sm:grid-cols-1">
+                {REVIVAL_INTENT_OPTIONS.map((option) => {
+                  const isSelected = revivalIntent === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      onClick={() => {
+                        onRevivalIntentChange(option.key);
+                        setValidationError(null);
+                      }}
+                      className={`w-full text-left p-4 border transition-all duration-150 cursor-pointer focus:outline-none flex flex-col justify-start rounded-none ${
+                        isSelected
+                          ? "border-brand-accent bg-brand-accent/5 ring-1 ring-brand-accent"
+                          : "border-border-strong bg-surface-base hover:border-brand-accent/50 hover:bg-surface-secondary/30"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                          isSelected ? "border-brand-accent" : "border-border-strong bg-surface-secondary"
+                        }`}>
+                          {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />}
+                        </span>
+                        <strong className="text-xs font-mono uppercase tracking-wider text-text-primary font-bold">
+                          {option.title}
+                        </strong>
+                      </div>
+                      <p className="text-xs font-sans text-text-secondary mt-1.5 pl-6 leading-relaxed">
+                        {option.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {handoverState === "prepared" && (
+            <div className="border border-semantic-healthy/20 bg-semantic-healthy/5 p-5">
+              <span className="text-[9px] font-mono uppercase text-semantic-healthy tracking-wider block mb-2 font-bold select-none font-mono">DESIRED OUTCOME</span>
+              <strong className="text-sm font-outfit text-text-primary block font-extrabold mb-1">
+                {REVIVAL_INTENT_OPTIONS.find(o => o.key === revivalIntent)?.title || "No intent selected"}
+              </strong>
+              <p className="text-xs font-sans text-text-secondary leading-relaxed">
+                {REVIVAL_INTENT_OPTIONS.find(o => o.key === revivalIntent)?.description || "No description available."}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 8. DEVELOPER NOTES */}
         <div
           className={`border p-6 rounded-none transition-all duration-200 shadow-sm ${
             handoverState === "prepared"
@@ -942,7 +1085,7 @@ export default function HandoverPage({
 
           {handoverState === "prepared" && (
             <div className="border border-semantic-healthy/20 bg-semantic-healthy/5 p-5">
-              <span className="text-[9px] font-mono uppercase text-semantic-healthy tracking-wider block mb-2 font-bold select-none">OUTGOING DEVELOPER NOTES</span>
+              <span className="text-[9px] font-mono uppercase text-semantic-healthy tracking-wider block mb-2 font-bold select-none font-mono">OUTGOING DEVELOPER NOTES</span>
               {developerNotes.trim() ? (
                 <div className="text-xs font-mono text-text-primary leading-relaxed whitespace-pre-wrap select-text">
                   {developerNotes}
@@ -956,7 +1099,7 @@ export default function HandoverPage({
           )}
         </div>
 
-        {/* 8. NEXT DEVELOPER SECTION */}
+        {/* 9. NEXT DEVELOPER SECTION */}
         {handoverState === "prepared" && (
           <div className="border border-border-muted bg-surface-secondary/45 p-6 rounded-none shadow-sm">
             <div className="border-b border-border-muted/65 pb-3 mb-4 select-none flex items-center gap-2">
@@ -994,8 +1137,9 @@ export default function HandoverPage({
           </button>
           <button
             onClick={() => {
-              if (confirm("Are you sure you want to reset the handover? This will clear all developer notes.")) {
+              if (confirm("Are you sure you want to reset the handover? This will clear all developer notes and the revival intent.")) {
                 onNotesChange("");
+                onRevivalIntentChange("");
                 onStateChange("not_started");
               }
             }}
