@@ -30,6 +30,23 @@ export interface OwnerSummary {
   avatar_url: string | null;
 }
 
+export interface RevivalBriefResponse {
+  id: number;
+  repository_id: number;
+  developer_notes: string;
+  revival_intent: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RevivalBriefPayload {
+  developer_notes?: string;
+  revival_intent?: string;
+  status?: string;
+}
+
+
 export interface RepositoryResponse {
   id: number;
   github_repo_id: number;
@@ -215,5 +232,28 @@ export const api = {
   // Discover repositories
   discoverRepositories(): Promise<RepositoryResponse[]> {
     return request<RepositoryResponse[]>("/repositories/discover");
+  },
+
+  // Get Revival Brief
+  getHandover(repositoryId: number): Promise<RevivalBriefResponse | null> {
+    return request<RevivalBriefResponse | null>(`/repositories/${repositoryId}/handover`);
+  },
+
+  // Save Revival Brief
+  saveHandover(repositoryId: number, payload: RevivalBriefPayload): Promise<RevivalBriefResponse> {
+    return request<RevivalBriefResponse>(`/repositories/${repositoryId}/handover`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Delete/Reset Revival Brief
+  deleteHandover(repositoryId: number): Promise<{ status: string }> {
+    return request<{ status: string }>(`/repositories/${repositoryId}/handover`, {
+      method: "DELETE",
+    });
   },
 };

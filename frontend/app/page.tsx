@@ -18,85 +18,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Local handover states
-  const [handoverStates, setHandoverStates] = useState<Record<number, "not_started" | "in_progress" | "prepared">>({});
-  const [developerNotes, setDeveloperNotes] = useState<Record<number, string>>({});
-  const [revivalIntents, setRevivalIntents] = useState<Record<number, string>>({});
-  const [publicationStates, setPublicationStates] = useState<Record<number, "unpublished" | "published">>({});
-
-  // Load handover state from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedStates = localStorage.getItem("secondcommit_handover_states");
-      const storedNotes = localStorage.getItem("secondcommit_developer_notes");
-      const storedIntents = localStorage.getItem("secondcommit_revival_intents");
-      if (storedStates) {
-        try {
-          setHandoverStates(JSON.parse(storedStates));
-        } catch (e) {
-          console.error("Failed to parse handover states:", e);
-        }
-      }
-      if (storedNotes) {
-        try {
-          setDeveloperNotes(JSON.parse(storedNotes));
-        } catch (e) {
-          console.error("Failed to parse developer notes:", e);
-        }
-      }
-      if (storedIntents) {
-        try {
-          setRevivalIntents(JSON.parse(storedIntents));
-        } catch (e) {
-          console.error("Failed to parse revival intents:", e);
-        }
-      }
-    }
-  }, []);
-
-  const updateHandoverState = async (repoId: number, state: "not_started" | "in_progress" | "prepared") => {
-    // When editing (state === in_progress), set publication state back to unpublished on success
-    if (state === "in_progress") {
-      try {
-        await api.unpublishRepository(repoId);
-        setPublicationStates((prev) => ({ ...prev, [repoId]: "unpublished" as const }));
-      } catch (err: any) {
-        console.error("Failed to unpublish on backend when editing handover:", err);
-        throw err;
-      }
-    }
-
-    const updated = { ...handoverStates, [repoId]: state };
-    setHandoverStates(updated);
-    localStorage.setItem("secondcommit_handover_states", JSON.stringify(updated));
-  };
-
-  const updateDeveloperNotes = (repoId: number, notes: string) => {
-    const updated = { ...developerNotes, [repoId]: notes };
-    setDeveloperNotes(updated);
-    localStorage.setItem("secondcommit_developer_notes", JSON.stringify(updated));
-  };
-
-  const updateRevivalIntent = (repoId: number, intent: string) => {
-    const updated = { ...revivalIntents, [repoId]: intent };
-    setRevivalIntents(updated);
-    localStorage.setItem("secondcommit_revival_intents", JSON.stringify(updated));
-  };
-
-  const updatePublicationState = async (repoId: number, status: "unpublished" | "published") => {
-    try {
-      if (status === "published") {
-        await api.publishRepository(repoId);
-      } else {
-        await api.unpublishRepository(repoId);
-      }
-      setPublicationStates((prev) => ({ ...prev, [repoId]: status }));
-    } catch (err: any) {
-      console.error(`Failed to update publication state to ${status}:`, err);
-      throw err;
-    }
-  };
-
   // Authenticate user on mount
   const checkAuth = async () => {
     try {
@@ -104,13 +25,6 @@ export default function Home() {
       setUser(res.user);
       setRepos(res.repositories);
       
-      // Sync publication states from the backend
-      const initialPubStates: Record<number, "unpublished" | "published"> = {};
-      res.repositories.forEach((repo) => {
-        initialPubStates[repo.id] = repo.published ? "published" : "unpublished";
-      });
-      setPublicationStates(initialPubStates);
-
       const analyticsRes = await api.getAnalytics();
       setAnalytics(analyticsRes);
     } catch (err: any) {
@@ -328,14 +242,7 @@ export default function Home() {
               checkAuth(); // Refresh lists when going back
             }}
             onSyncSuccess={checkAuth}
-            handoverState={handoverStates[selectedRepoId] || "not_started"}
-            developerNotes={developerNotes[selectedRepoId] || ""}
-            revivalIntent={revivalIntents[selectedRepoId] || ""}
-            publicationState={publicationStates[selectedRepoId] || "unpublished"}
-            onStateChange={(state) => updateHandoverState(selectedRepoId, state)}
-            onNotesChange={(notes) => updateDeveloperNotes(selectedRepoId, notes)}
-            onRevivalIntentChange={(intent) => updateRevivalIntent(selectedRepoId, intent)}
-            onPublicationStateChange={(status) => updatePublicationState(selectedRepoId, status)}
+            isOwner={repos.some((r) => r.id === selectedRepoId)}
           />
         ) : activeTab === "dashboard" ? (
           <Dashboard

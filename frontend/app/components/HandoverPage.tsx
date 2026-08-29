@@ -22,6 +22,7 @@ interface HandoverPageProps {
   onNotesChange: (notes: string) => void;
   onRevivalIntentChange: (intent: string) => void;
   onPublicationStateChange: (status: "unpublished" | "published") => Promise<void> | void;
+  isOwner?: boolean;
 }
 
 interface GithubContentItem {
@@ -55,28 +56,18 @@ const RenderHonestyBadge = ({ state }: { state: "confirmed" | "signal" | "unavai
 
 const REVIVAL_INTENT_OPTIONS = [
   {
-    key: "looking_for_maintainer",
-    title: "Looking for a maintainer",
-    description: "Someone who can take primary responsibility for continuing the project."
+    key: "maintainer",
+    title: "Looking for a Co-Maintainer",
+    description: "The owner wants to continue working on this project, but needs another developer to share the maintenance workload."
   },
   {
-    key: "looking_for_contributors",
-    title: "Looking for contributors",
-    description: "The owner wants other developers to contribute while retaining ownership."
+    key: "takeover",
+    title: "Looking for a New Owner",
+    description: "The owner is stepping away completely and wants to hand over full ownership and control to someone else."
   },
   {
-    key: "looking_for_collaborator",
-    title: "Looking for a collaborator",
-    description: "The owner wants to work together with another developer."
-  },
-  {
-    key: "take_over",
-    title: "Looking for someone to take over",
-    description: "The owner is open to another developer taking over the project's future direction."
-  },
-  {
-    key: "future_revival",
-    title: "Preserving for future revival",
+    key: "archive",
+    title: "Preserve and Document Only",
     description: "The owner is not actively looking for someone right now, but wants the project's context preserved for future revival."
   }
 ];
@@ -95,6 +86,7 @@ export default function HandoverPage({
   onNotesChange,
   onRevivalIntentChange,
   onPublicationStateChange,
+  isOwner = true,
 }: HandoverPageProps) {
   const [readmeContent, setReadmeContent] = useState<string | null>(null);
   const [directoryStructure, setDirectoryStructure] = useState<GithubContentItem[] | null>(null);
@@ -578,178 +570,184 @@ export default function HandoverPage({
           </div>
 
           {/* PROJECT VISIBILITY CARD */}
-          <div className="border border-border-strong bg-surface-base p-8 shadow-sm">
-            {validationError && (
-              <div className="mb-6 p-4 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-sans text-xs flex items-start gap-2.5 animate-fade-in">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 shrink-0 mt-0.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div>
-                  <strong className="font-outfit block text-xs mb-0.5 font-bold">Publication Error</strong>
-                  <span>{validationError}</span>
+          {isOwner && (
+            <div className="border border-border-strong bg-surface-base p-8 shadow-sm">
+              {validationError && (
+                <div className="mb-6 p-4 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-sans text-xs flex items-start gap-2.5 animate-fade-in">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 shrink-0 mt-0.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <strong className="font-outfit block text-xs mb-0.5 font-bold">Publication Error</strong>
+                    <span>{validationError}</span>
+                  </div>
                 </div>
-              </div>
-            )}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div className="flex-1">
-                <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">PROJECT VISIBILITY</span>
-                <h3 className="text-base font-outfit text-text-primary font-bold mb-1">
-                  Make this project available for another developer to discover.
-                </h3>
-                {publicationState === "published" ? (
-                  <p className="text-xs text-text-secondary font-sans leading-relaxed">
-                    This project is now marked as available for revival. Other developers on SecondCommit will be able to search and view its handover context.
-                  </p>
-                ) : (
-                  <p className="text-xs text-text-secondary font-sans leading-relaxed">
-                    This project is currently hidden. Publish the project to allow the community to discover it.
-                  </p>
-                )}
-              </div>
-
-              <div className="shrink-0 flex flex-wrap items-center gap-6">
-                <div className="flex flex-col items-start md:items-end">
-                  <span className="text-[8px] font-mono text-text-muted uppercase block font-bold">Status</span>
-                  <span className={`text-xs font-mono font-bold uppercase mt-1 ${
-                    publicationState === "published" ? "text-semantic-healthy" : "text-text-muted"
-                  }`}>
-                    {publicationState === "published" ? "● PUBLISHED" : "○ NOT PUBLISHED"}
-                  </span>
+              )}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div className="flex-1">
+                  <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">PROJECT VISIBILITY</span>
+                  <h3 className="text-base font-outfit text-text-primary font-bold mb-1">
+                    Make this project available for another developer to discover.
+                  </h3>
+                  {publicationState === "published" ? (
+                    <p className="text-xs text-text-secondary font-sans leading-relaxed">
+                      This project is now marked as available for revival. Other developers on SecondCommit will be able to search and view its handover context.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-text-secondary font-sans leading-relaxed">
+                      This project is currently hidden. Publish the project to allow the community to discover it.
+                    </p>
+                  )}
                 </div>
 
-                {publicationState === "published" ? (
-                  <button
-                    disabled={isPublishing}
-                    onClick={async () => {
-                      setIsPublishing(true);
-                      setValidationError(null);
-                      try {
-                        await onPublicationStateChange("unpublished");
-                      } catch (err: any) {
-                        setValidationError(err.message || "Failed to unpublish repository.");
-                      } finally {
-                        setIsPublishing(false);
-                      }
-                    }}
-                    className={`flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm ${
-                      isPublishing ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-                    }`}
-                  >
-                    {isPublishing ? "Unpublishing..." : "Unpublish Project"}
-                  </button>
-                ) : (
-                  <button
-                    disabled={isPublishing}
-                    onClick={async () => {
-                      if (!revivalIntent) {
-                        setValidationError("Revival Intent must be selected before publishing the project.");
-                      } else {
+                <div className="shrink-0 flex flex-wrap items-center gap-6">
+                  <div className="flex flex-col items-start md:items-end">
+                    <span className="text-[8px] font-mono text-text-muted uppercase block font-bold">Status</span>
+                    <span className={`text-xs font-mono font-bold uppercase mt-1 ${
+                      publicationState === "published" ? "text-semantic-healthy" : "text-text-muted"
+                    }`}>
+                      {publicationState === "published" ? "● PUBLISHED" : "○ NOT PUBLISHED"}
+                    </span>
+                  </div>
+
+                  {publicationState === "published" ? (
+                    <button
+                      disabled={isPublishing}
+                      onClick={async () => {
                         setIsPublishing(true);
                         setValidationError(null);
                         try {
-                          await onPublicationStateChange("published");
+                          await onPublicationStateChange("unpublished");
                         } catch (err: any) {
-                          setValidationError(err.message || "Failed to publish repository.");
+                          setValidationError(err.message || "Failed to unpublish repository.");
                         } finally {
                           setIsPublishing(false);
                         }
-                      }
-                    }}
-                    className={`flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm hover:shadow-md ${
-                      isPublishing ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-                    }`}
-                  >
-                    {isPublishing ? "Publishing..." : "Publish Project"}
-                  </button>
-                )}
+                      }}
+                      className={`flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm ${
+                        isPublishing ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                      }`}
+                    >
+                      {isPublishing ? "Unpublishing..." : "Unpublish Project"}
+                    </button>
+                  ) : (
+                    <button
+                      disabled={isPublishing}
+                      onClick={async () => {
+                        if (!revivalIntent) {
+                          setValidationError("Revival Intent must be selected before publishing the project.");
+                        } else {
+                          setIsPublishing(true);
+                          setValidationError(null);
+                          try {
+                            await onPublicationStateChange("published");
+                          } catch (err: any) {
+                            setValidationError(err.message || "Failed to publish repository.");
+                          } finally {
+                            setIsPublishing(false);
+                          }
+                        }
+                      }}
+                      className={`flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm hover:shadow-md ${
+                        isPublishing ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                      }`}
+                    >
+                      {isPublishing ? "Publishing..." : "Publish Project"}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       ) : (
         <div className="space-y-6 mb-10">
           {/* HANDOVER ACTION CARD */}
-          <div className="border border-border-muted bg-surface-base p-8 shadow-sm">
-            {validationError && (
-              <div className="mb-6 p-4 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-sans text-xs flex items-start gap-2.5 animate-fade-in">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 shrink-0 mt-0.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div>
-                  <strong className="font-outfit block text-xs mb-0.5 font-bold">Handoff Validation Alert</strong>
-                  <span>{validationError}</span>
+          {isOwner && (
+            <div className="border border-border-muted bg-surface-base p-8 shadow-sm">
+              {validationError && (
+                <div className="mb-6 p-4 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-sans text-xs flex items-start gap-2.5 animate-fade-in">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 shrink-0 mt-0.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <strong className="font-outfit block text-xs mb-0.5 font-bold">Handoff Validation Alert</strong>
+                    <span>{validationError}</span>
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div className="flex-1">
+                  <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">HANDOVER ACTION</span>
+                  {handoverState === "not_started" && (
+                    <p className="text-sm text-text-secondary font-sans leading-relaxed">
+                      Prepare a structured knowledge package for the next developer who takes over this repository. It analyzes project layouts and repository files automatically.
+                    </p>
+                  )}
+                  {handoverState === "in_progress" && (
+                    <p className="text-sm text-text-secondary font-sans leading-relaxed">
+                      You are building the handover guide. Select a **Revival Intent** below, add your custom context in **From the Previous Developer**, and complete the package when ready.
+                    </p>
+                  )}
+                </div>
+
+                <div className="shrink-0 flex items-center gap-3">
+                  {handoverState === "not_started" && (
+                    <button
+                      onClick={() => onStateChange("in_progress")}
+                      className="flex items-center justify-center gap-2.5 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+                    >
+                      Start Handover
+                    </button>
+                  )}
+                  {handoverState === "in_progress" && (
+                    <button
+                      onClick={() => {
+                        if (!revivalIntent) {
+                          setValidationError("Please select a Revival Intent for this project before completing the handover.");
+                        } else {
+                          setValidationError(null);
+                          onStateChange("prepared");
+                        }
+                      }}
+                      className="flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+                    >
+                      Complete Handover
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div className="flex-1">
-                <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">HANDOVER ACTION</span>
-                {handoverState === "not_started" && (
-                  <p className="text-sm text-text-secondary font-sans leading-relaxed">
-                    Prepare a structured knowledge package for the next developer who takes over this repository. It analyzes project layouts and repository files automatically.
-                  </p>
-                )}
-                {handoverState === "in_progress" && (
-                  <p className="text-sm text-text-secondary font-sans leading-relaxed">
-                    You are building the handover guide. Select a **Revival Intent** below, add your custom context in **From the Previous Developer**, and complete the package when ready.
-                  </p>
-                )}
-              </div>
-
-              <div className="shrink-0 flex items-center gap-3">
-                {handoverState === "not_started" && (
-                  <button
-                    onClick={() => onStateChange("in_progress")}
-                    className="flex items-center justify-center gap-2.5 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
-                  >
-                    Start Handover
-                  </button>
-                )}
-                {handoverState === "in_progress" && (
-                  <button
-                    onClick={() => {
-                      if (!revivalIntent) {
-                        setValidationError("Please select a Revival Intent for this project before completing the handover.");
-                      } else {
-                        setValidationError(null);
-                        onStateChange("prepared");
-                      }
-                    }}
-                    className="flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
-                  >
-                    Complete Handover
-                  </button>
-                )}
-              </div>
             </div>
-          </div>
+          )}
 
           {/* PROJECT VISIBILITY CARD (DISABLED DURING INITIAL EDITS) */}
-          <div className="border border-border-muted bg-surface-secondary/40 p-8 shadow-sm opacity-60">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 select-none">
-              <div className="flex-1">
-                <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">PROJECT VISIBILITY</span>
-                <h3 className="text-base font-outfit text-text-primary font-bold mb-1">
-                  Make this project available for another developer to discover.
-                </h3>
-                <p className="text-xs text-text-secondary font-sans leading-relaxed">
-                  This project cannot be published because the handover context has not been prepared yet. Complete the handover details first.
-                </p>
-              </div>
-              <div className="shrink-0 flex items-center gap-6">
-                <div className="flex flex-col items-start md:items-end">
-                  <span className="text-[8px] font-mono text-text-muted uppercase block font-bold">Status</span>
-                  <span className="text-xs font-mono font-bold text-text-muted uppercase mt-1">○ NOT PUBLISHED</span>
+          {isOwner && (
+            <div className="border border-border-muted bg-surface-secondary/40 p-8 shadow-sm opacity-60">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 select-none">
+                <div className="flex-1">
+                  <span className="text-[9px] font-mono tracking-widest uppercase text-text-muted font-bold block mb-2">PROJECT VISIBILITY</span>
+                  <h3 className="text-base font-outfit text-text-primary font-bold mb-1">
+                    Make this project available for another developer to discover.
+                  </h3>
+                  <p className="text-xs text-text-secondary font-sans leading-relaxed">
+                    This project cannot be published because the handover context has not been prepared yet. Complete the handover details first.
+                  </p>
                 </div>
-                <button
-                  disabled
-                  className="flex items-center justify-center gap-2.5 rounded-none border border-border-muted bg-surface-secondary/20 text-text-muted px-5 py-3 text-[10px] font-mono uppercase tracking-widest cursor-not-allowed outline-none"
-                >
-                  Publish Project
-                </button>
+                <div className="shrink-0 flex items-center gap-6">
+                  <div className="flex flex-col items-start md:items-end">
+                    <span className="text-[8px] font-mono text-text-muted uppercase block font-bold">Status</span>
+                    <span className="text-xs font-mono font-bold text-text-muted uppercase mt-1">○ NOT PUBLISHED</span>
+                  </div>
+                  <button
+                    disabled
+                    className="flex items-center justify-center gap-2.5 rounded-none border border-border-muted bg-surface-secondary/20 text-text-muted px-5 py-3 text-[10px] font-mono uppercase tracking-widest cursor-not-allowed outline-none"
+                  >
+                    Publish Project
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -1260,7 +1258,7 @@ export default function HandoverPage({
       </div>
 
       {/* Prepare/Edit controls at the bottom for Prepared state */}
-      {handoverState === "prepared" && (
+      {isOwner && handoverState === "prepared" && (
         <div className="mt-12 pt-6 border-t border-border-muted flex flex-col gap-3 select-none">
           {publicationState === "published" && (
             <p className="text-xs text-brand-accent font-sans italic">

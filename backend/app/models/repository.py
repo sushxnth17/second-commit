@@ -48,3 +48,10 @@ class Repository(Base):
     )
 
     owner = relationship("User")
+
+    revival_brief = relationship(
+        "RevivalBrief",
+        back_populates="repository",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )

@@ -6,7 +6,10 @@ from app.database.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.repository import Repository
-from app.services.github_service import get_user_repositories, get_repository_details
+from app.models.revival_brief import RevivalBrief
+from app.schemas.repository import RepositoryResponse
+from app.schemas.dashboard import RepositorySummary
+from app.schemas.revival_brief import RevivalBriefResponse, RevivalBriefUpdate
 from app.services.repository_service import (
     get_repository_by_github_id,
     create_repository,
@@ -14,7 +17,9 @@ from app.services.repository_service import (
     update_repository,
     get_repository_by_id,
 )
-from app.schemas import RepositoryResponse
+from app.services.github_service import get_user_repositories, get_repository_details
+from app.services.health_service import get_health
+from app.services.dormancy_service import get_repository_dormancy
 
 
 router = APIRouter(
@@ -124,7 +129,7 @@ async def get_repository(
             detail=str(e),
         )
 
-    if repository.owner_id != current_user.id:
+    if repository.owner_id != current_user.id and not repository.published:
         raise HTTPException(
             status_code=404,
             detail="Repository not found",
@@ -262,3 +267,90 @@ async def unpublish_repository(
     db.refresh(repository)
 
     return repository
+
+
+@router.get("/{repository_id}/handover", response_model=RevivalBriefResponse | None)
+async def get_repository_handover(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get the current Revival Brief for the repository.
+    Owners can read it anytime.
+    Other authenticated users can read it only if the repository is published.
+    """
+    try:
+        repository = get_repository_by_id(db, repository_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    if repository.owner_id != current_user.id and not repository.published:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    brief = db.query(RevivalBrief).filter(RevivalBrief.repository_id == repository_id).first()
+    return brief
+
+
+@router.put("/{repository_id}/handover", response_model=RevivalBriefResponse)
+async def update_repository_handover(
+    repository_id: int,
+    payload: RevivalBriefUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create or update the Revival Brief. Only the owner can do this.
+    """
+    try:
+        repository = get_repository_by_id(db, repository_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    if repository.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    brief = db.query(RevivalBrief).filter(RevivalBrief.repository_id == repository_id).first()
+    if not brief:
+        brief = RevivalBrief(
+            repository_id=repository_id,
+            developer_notes=payload.developer_notes if payload.developer_notes is not None else "",
+            revival_intent=payload.revival_intent if payload.revival_intent is not None else "",
+            status=payload.status if payload.status is not None else "draft",
+        )
+        db.add(brief)
+    else:
+        if payload.developer_notes is not None:
+            brief.developer_notes = payload.developer_notes
+        if payload.revival_intent is not None:
+            brief.revival_intent = payload.revival_intent
+        if payload.status is not None:
+            brief.status = payload.status
+
+    db.commit()
+    db.refresh(brief)
+    return brief
+
+
+@router.delete("/{repository_id}/handover")
+async def delete_repository_handover(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Reset/delete the Revival Brief. Only the owner can do this.
+    """
+    try:
+        repository = get_repository_by_id(db, repository_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    if repository.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    brief = db.query(RevivalBrief).filter(RevivalBrief.repository_id == repository_id).first()
+    if brief:
+        db.delete(brief)
+        db.commit()
+    return {"status": "success"}
