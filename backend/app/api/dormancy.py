@@ -26,7 +26,7 @@ async def get_repository_dormancy_endpoint(
         .first()
     )
 
-    if not repository or repository.owner_id != current_user.id:
+    if not repository or (repository.owner_id != current_user.id and not repository.published):
         raise HTTPException(
             status_code=404,
             detail="Repository not found",

@@ -6,93 +6,17 @@ import Navbar from "./components/Navbar";
 import Dashboard from "./components/Dashboard";
 import RepoDetails from "./components/RepoDetails";
 import ImportModal from "./components/ImportModal";
+import DiscoverPage from "./components/DiscoverPage";
 
 export default function Home() {
   const [user, setUser] = useState<UserSummary | null>(null);
   const [repos, setRepos] = useState<RepositorySummary[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "analytics">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "analytics" | "discover">("dashboard");
   const [selectedRepoId, setSelectedRepoId] = useState<number | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Local handover states
-  const [handoverStates, setHandoverStates] = useState<Record<number, "not_started" | "in_progress" | "prepared">>({});
-  const [developerNotes, setDeveloperNotes] = useState<Record<number, string>>({});
-  const [revivalIntents, setRevivalIntents] = useState<Record<number, string>>({});
-  const [publicationStates, setPublicationStates] = useState<Record<number, "unpublished" | "published">>({});
-
-  // Load handover state from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedStates = localStorage.getItem("secondcommit_handover_states");
-      const storedNotes = localStorage.getItem("secondcommit_developer_notes");
-      const storedIntents = localStorage.getItem("secondcommit_revival_intents");
-      const storedPublications = localStorage.getItem("secondcommit_publication_states");
-      if (storedStates) {
-        try {
-          setHandoverStates(JSON.parse(storedStates));
-        } catch (e) {
-          console.error("Failed to parse handover states:", e);
-        }
-      }
-      if (storedNotes) {
-        try {
-          setDeveloperNotes(JSON.parse(storedNotes));
-        } catch (e) {
-          console.error("Failed to parse developer notes:", e);
-        }
-      }
-      if (storedIntents) {
-        try {
-          setRevivalIntents(JSON.parse(storedIntents));
-        } catch (e) {
-          console.error("Failed to parse revival intents:", e);
-        }
-      }
-      if (storedPublications) {
-        try {
-          setPublicationStates(JSON.parse(storedPublications));
-        } catch (e) {
-          console.error("Failed to parse publication states:", e);
-        }
-      }
-    }
-  }, []);
-
-  const updateHandoverState = (repoId: number, state: "not_started" | "in_progress" | "prepared") => {
-    const updated = { ...handoverStates, [repoId]: state };
-    setHandoverStates(updated);
-    localStorage.setItem("secondcommit_handover_states", JSON.stringify(updated));
-
-    // When editing (state === in_progress), set publication state back to unpublished
-    if (state === "in_progress") {
-      setPublicationStates((prev) => {
-        const next = { ...prev, [repoId]: "unpublished" as const };
-        localStorage.setItem("secondcommit_publication_states", JSON.stringify(next));
-        return next;
-      });
-    }
-  };
-
-  const updateDeveloperNotes = (repoId: number, notes: string) => {
-    const updated = { ...developerNotes, [repoId]: notes };
-    setDeveloperNotes(updated);
-    localStorage.setItem("secondcommit_developer_notes", JSON.stringify(updated));
-  };
-
-  const updateRevivalIntent = (repoId: number, intent: string) => {
-    const updated = { ...revivalIntents, [repoId]: intent };
-    setRevivalIntents(updated);
-    localStorage.setItem("secondcommit_revival_intents", JSON.stringify(updated));
-  };
-
-  const updatePublicationState = (repoId: number, status: "unpublished" | "published") => {
-    const updated = { ...publicationStates, [repoId]: status };
-    setPublicationStates(updated);
-    localStorage.setItem("secondcommit_publication_states", JSON.stringify(updated));
-  };
 
   // Authenticate user on mount
   const checkAuth = async () => {
@@ -302,39 +226,35 @@ export default function Home() {
       <Navbar
         user={user}
         activeTab={activeTab}
-        setActiveTab={(tab: "dashboard" | "analytics") => {
+        setActiveTab={(tab: "dashboard" | "analytics" | "discover") => {
           setActiveTab(tab);
-          setSelectedRepoId(null); // Clear selected repo when switching tabs
+          setSelectedRepoId(null);
         }}
         onLogout={handleLogout}
       />
 
       <main className="flex-1">
-        {activeTab === "dashboard" ? (
-          selectedRepoId !== null ? (
-            <RepoDetails
-              repoId={selectedRepoId}
-              onBack={() => setSelectedRepoId(null)}
-              onSyncSuccess={checkAuth}
-              handoverState={handoverStates[selectedRepoId] || "not_started"}
-              developerNotes={developerNotes[selectedRepoId] || ""}
-              revivalIntent={revivalIntents[selectedRepoId] || ""}
-              publicationState={publicationStates[selectedRepoId] || "unpublished"}
-              onStateChange={(state) => updateHandoverState(selectedRepoId, state)}
-              onNotesChange={(notes) => updateDeveloperNotes(selectedRepoId, notes)}
-              onRevivalIntentChange={(intent) => updateRevivalIntent(selectedRepoId, intent)}
-              onPublicationStateChange={(status) => updatePublicationState(selectedRepoId, status)}
-            />
-          ) : (
-            <Dashboard
-              user={user}
-              repos={repos}
-              analytics={analytics}
-              onImportClick={() => setShowImportModal(true)}
-              onSelectRepo={setSelectedRepoId}
-              onSyncSuccess={checkAuth}
-            />
-          )
+        {selectedRepoId !== null ? (
+          <RepoDetails
+            repoId={selectedRepoId}
+            onBack={() => {
+              setSelectedRepoId(null);
+              checkAuth(); // Refresh lists when going back
+            }}
+            onSyncSuccess={checkAuth}
+            isOwner={repos.some((r) => r.id === selectedRepoId)}
+          />
+        ) : activeTab === "dashboard" ? (
+          <Dashboard
+            user={user}
+            repos={repos}
+            analytics={analytics}
+            onImportClick={() => setShowImportModal(true)}
+            onSelectRepo={setSelectedRepoId}
+            onSyncSuccess={checkAuth}
+          />
+        ) : activeTab === "discover" ? (
+          <DiscoverPage onSelectRepo={setSelectedRepoId} />
         ) : (
           /* Analytics Tab Panel */
           <div className="mx-auto max-w-5xl px-6 py-10 select-none">

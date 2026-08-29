@@ -21,7 +21,31 @@ export interface RepositorySummary {
   health_score?: number;
   health_grade?: string;
   dormancy_status?: string;
+  published?: boolean;
 }
+
+export interface OwnerSummary {
+  username: string;
+  name: string | null;
+  avatar_url: string | null;
+}
+
+export interface RevivalBriefResponse {
+  id: number;
+  repository_id: number;
+  developer_notes: string;
+  revival_intent: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RevivalBriefPayload {
+  developer_notes?: string;
+  revival_intent?: string;
+  status?: string;
+}
+
 
 export interface RepositoryResponse {
   id: number;
@@ -40,6 +64,8 @@ export interface RepositoryResponse {
   created_at: string | null;
   updated_at: string | null;
   pushed_at: string | null;
+  published: boolean;
+  owner?: OwnerSummary | null;
 }
 
 export interface DashboardResponse {
@@ -187,5 +213,47 @@ export const api = {
   // AI Insights
   getRepositoryAIInsights(id: number): Promise<AIInsightsResponse> {
     return request<AIInsightsResponse>(`/repositories/${id}/ai-insights`);
+  },
+
+  // Publish repository
+  publishRepository(id: number): Promise<RepositoryResponse> {
+    return request<RepositoryResponse>(`/repositories/${id}/publish`, {
+      method: "POST",
+    });
+  },
+
+  // Unpublish repository
+  unpublishRepository(id: number): Promise<RepositoryResponse> {
+    return request<RepositoryResponse>(`/repositories/${id}/unpublish`, {
+      method: "POST",
+    });
+  },
+
+  // Discover repositories
+  discoverRepositories(): Promise<RepositoryResponse[]> {
+    return request<RepositoryResponse[]>("/repositories/discover");
+  },
+
+  // Get Revival Brief
+  getHandover(repositoryId: number): Promise<RevivalBriefResponse | null> {
+    return request<RevivalBriefResponse | null>(`/repositories/${repositoryId}/handover`);
+  },
+
+  // Save Revival Brief
+  saveHandover(repositoryId: number, payload: RevivalBriefPayload): Promise<RevivalBriefResponse> {
+    return request<RevivalBriefResponse>(`/repositories/${repositoryId}/handover`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Delete/Reset Revival Brief
+  deleteHandover(repositoryId: number): Promise<{ status: string }> {
+    return request<{ status: string }>(`/repositories/${repositoryId}/handover`, {
+      method: "DELETE",
+    });
   },
 };

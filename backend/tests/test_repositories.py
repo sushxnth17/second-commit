@@ -109,6 +109,8 @@ def test_get_repositories_endpoint(client, db_session):
         "created_at",
         "updated_at",
         "pushed_at",
+        "published",
+        "owner",
     }
     assert set(repo_data.keys()) == expected_keys
 
@@ -749,3 +751,178 @@ def test_sync_repository_error_sanitization(client, db_session, test_user, mocke
     assert data["detail"] == "GitHub service is temporarily unavailable. Please try again later."
     assert "secret_token" not in response.text
     assert "SHOULD_NOT_LEAK" not in response.text
+
+
+def test_repository_starts_unpublished(db_session, test_repo):
+    # The default state should be False (unpublished)
+    assert test_repo.published is False
+
+
+def test_owner_can_publish_unpublish_repository(client, db_session, test_user, test_repo):
+    # 1. Publish repository
+    response = client.post(f"/repositories/{test_repo.id}/publish")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == test_repo.id
+    assert data["published"] is True
+
+    # Check database status
+    db_session.refresh(test_repo)
+    assert test_repo.published is True
+
+    # 2. Unpublish repository
+    response = client.post(f"/repositories/{test_repo.id}/unpublish")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == test_repo.id
+    assert data["published"] is False
+
+    # Check database status
+    db_session.refresh(test_repo)
+    assert test_repo.published is False
+
+
+def test_other_user_cannot_publish_unpublish_repository(client, db_session, test_repo, auth_context):
+    from app.services.user_service import create_user
+    # Create another user
+    other_user = create_user(
+        db=db_session,
+        github_id=67890,
+        username="otheruser",
+        name="Other User",
+        avatar_url="https://avatar.url/other",
+        access_token="other_token",
+    )
+
+    # Set auth context to other_user
+    auth_context.user = other_user
+
+    # Try publishing owner's repository
+    response = client.post(f"/repositories/{test_repo.id}/publish")
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Repository owned by another user"
+
+    # Try unpublishing owner's repository
+    response = client.post(f"/repositories/{test_repo.id}/unpublish")
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Repository owned by another user"
+
+
+def test_unauthenticated_user_cannot_publish_unpublish_repository(client, test_repo, auth_context):
+    # Set auth context to None (explicitly unauthenticated)
+    auth_context.user = None
+
+    response = client.post(f"/repositories/{test_repo.id}/publish")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+
+    response = client.post(f"/repositories/{test_repo.id}/unpublish")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+
+
+def test_publication_endpoint_not_found(client, db_session, test_user):
+    # Repository does not exist
+    response = client.post("/repositories/99999/publish")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Repository not found"
+
+    response = client.post("/repositories/99999/unpublish")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Repository not found"
+
+
+def test_discover_repositories(client, db_session, test_user):
+    from app.services.repository_service import create_repository
+    # Create two repositories: one published, one unpublished
+    repo_published = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 301,
+            "name": "repo-published",
+            "full_name": "testuser/repo-published",
+            "description": "This is published",
+            "html_url": "https://github.com/testuser/repo-published",
+            "language": "Python",
+            "default_branch": "main",
+        },
+    )
+    repo_published.published = True
+    db_session.commit()
+
+    repo_unpublished = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 302,
+            "name": "repo-unpublished",
+            "full_name": "testuser/repo-unpublished",
+            "description": "This is unpublished",
+            "html_url": "https://github.com/testuser/repo-unpublished",
+            "language": "Python",
+            "default_branch": "main",
+        },
+    )
+
+    # Call discover endpoint
+    response = client.get("/repositories/discover")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Assertions
+    assert len(data) == 1
+    assert data[0]["id"] == repo_published.id
+    assert data[0]["published"] is True
+    assert data[0]["owner"]["username"] == test_user.username
+    assert data[0]["owner"]["avatar_url"] == test_user.avatar_url
+
+
+def test_discover_repositories_ordering(client, db_session, test_user):
+    from app.services.repository_service import create_repository
+    # Create multiple published repositories
+    repo1 = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 401,
+            "name": "repo-first",
+            "full_name": "testuser/repo-first",
+            "html_url": "https://github.com/testuser/repo-first",
+            "default_branch": "main",
+        },
+    )
+    repo1.published = True
+
+    repo2 = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 402,
+            "name": "repo-second",
+            "full_name": "testuser/repo-second",
+            "html_url": "https://github.com/testuser/repo-second",
+            "default_branch": "main",
+        },
+    )
+    repo2.published = True
+    db_session.commit()
+
+    # Call discover
+    response = client.get("/repositories/discover")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Assertions: sorted by ID desc (newest first, repo2 then repo1)
+    assert len(data) == 2
+    assert data[0]["id"] == repo2.id
+    assert data[1]["id"] == repo1.id
+
+
+def test_discover_repositories_unauthenticated(client, auth_context):
+    # Set auth context to None (explicitly unauthenticated)
+    auth_context.user = None
+
+    response = client.get("/repositories/discover")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"

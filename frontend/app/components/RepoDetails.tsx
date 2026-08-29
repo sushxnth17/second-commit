@@ -14,28 +14,14 @@ interface RepoDetailsProps {
   repoId: number;
   onBack: () => void;
   onSyncSuccess: () => void;
-  handoverState: "not_started" | "in_progress" | "prepared";
-  developerNotes: string;
-  revivalIntent: string;
-  publicationState: "unpublished" | "published";
-  onStateChange: (state: "not_started" | "in_progress" | "prepared") => void;
-  onNotesChange: (notes: string) => void;
-  onRevivalIntentChange: (intent: string) => void;
-  onPublicationStateChange: (status: "unpublished" | "published") => void;
+  isOwner: boolean;
 }
 
 export default function RepoDetails({
   repoId,
   onBack,
   onSyncSuccess,
-  handoverState,
-  developerNotes,
-  revivalIntent,
-  publicationState,
-  onStateChange,
-  onNotesChange,
-  onRevivalIntentChange,
-  onPublicationStateChange,
+  isOwner,
 }: RepoDetailsProps) {
   const [repo, setRepo] = useState<RepositoryResponse | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -49,6 +35,12 @@ export default function RepoDetails({
   const [aiError, setAiError] = useState<string | null>(null);
   const [showHandover, setShowHandover] = useState(false);
 
+  // Local brief and publication states
+  const [handoverState, setHandoverState] = useState<"not_started" | "in_progress" | "prepared">("not_started");
+  const [developerNotes, setDeveloperNotes] = useState("");
+  const [revivalIntent, setRevivalIntent] = useState("");
+  const [publicationState, setPublicationState] = useState<"unpublished" | "published">("unpublished");
+
   const fetchData = async () => {
     setLoading(true);
     setError(null);
@@ -56,14 +48,25 @@ export default function RepoDetails({
     setAiLoading(false);
     setAiError(null);
     try {
-      const [r, h, d] = await Promise.all([
+      const [r, h, d, brief] = await Promise.all([
         api.getRepository(repoId),
         api.getRepositoryHealth(repoId),
         api.getRepositoryDormancy(repoId),
+        api.getHandover(repoId).catch(() => null),
       ]);
       setRepo(r);
       setHealth(h);
       setDormancy(d);
+      setPublicationState(r.published ? "published" : "unpublished");
+      if (brief) {
+        setHandoverState(brief.status === "prepared" ? "prepared" : "in_progress");
+        setDeveloperNotes(brief.developer_notes);
+        setRevivalIntent(brief.revival_intent);
+      } else {
+        setHandoverState("not_started");
+        setDeveloperNotes("");
+        setRevivalIntent("");
+      }
     } catch (err: any) {
       setError(err.message || "Failed to fetch repository details.");
     } finally {
@@ -74,6 +77,78 @@ export default function RepoDetails({
   useEffect(() => {
     fetchData();
   }, [repoId]);
+
+  const handleNotesChange = async (notes: string) => {
+    setDeveloperNotes(notes);
+    try {
+      await api.saveHandover(repoId, {
+        developer_notes: notes,
+        revival_intent: revivalIntent,
+        status: "draft",
+      });
+    } catch (err) {
+      console.error("Failed to save developer notes:", err);
+    }
+  };
+
+  const handleRevivalIntentChange = async (intent: string) => {
+    setRevivalIntent(intent);
+    try {
+      await api.saveHandover(repoId, {
+        developer_notes: developerNotes,
+        revival_intent: intent,
+        status: "draft",
+      });
+    } catch (err) {
+      console.error("Failed to save revival intent:", err);
+    }
+  };
+
+  const handleStateChange = async (state: "not_started" | "in_progress" | "prepared") => {
+    try {
+      if (state === "in_progress") {
+        if (handoverState === "prepared") {
+          await api.unpublishRepository(repoId);
+          setPublicationState("unpublished");
+        }
+        await api.saveHandover(repoId, {
+          developer_notes: developerNotes,
+          revival_intent: revivalIntent,
+          status: "draft",
+        });
+        setHandoverState("in_progress");
+      } else if (state === "prepared") {
+        await api.saveHandover(repoId, {
+          developer_notes: developerNotes,
+          revival_intent: revivalIntent,
+          status: "prepared",
+        });
+        setHandoverState("prepared");
+      } else if (state === "not_started") {
+        await api.deleteHandover(repoId);
+        setHandoverState("not_started");
+        setDeveloperNotes("");
+        setRevivalIntent("");
+      }
+    } catch (err: any) {
+      console.error("Failed to update handover state:", err);
+      throw err;
+    }
+  };
+
+  const handlePublicationStateChange = async (status: "unpublished" | "published") => {
+    try {
+      if (status === "published") {
+        await api.publishRepository(repoId);
+      } else {
+        await api.unpublishRepository(repoId);
+      }
+      setPublicationState(status);
+    } catch (err: any) {
+      console.error("Failed to update publication state:", err);
+      throw err;
+    }
+  };
 
   const handleGenerateAI = async () => {
     setAiLoading(true);
@@ -160,10 +235,11 @@ export default function RepoDetails({
         developerNotes={developerNotes}
         revivalIntent={revivalIntent}
         publicationState={publicationState}
-        onStateChange={onStateChange}
-        onNotesChange={onNotesChange}
-        onRevivalIntentChange={onRevivalIntentChange}
-        onPublicationStateChange={onPublicationStateChange}
+        onStateChange={handleStateChange}
+        onNotesChange={handleNotesChange}
+        onRevivalIntentChange={handleRevivalIntentChange}
+        onPublicationStateChange={handlePublicationStateChange}
+        isOwner={isOwner}
       />
     );
   }
@@ -187,27 +263,29 @@ export default function RepoDetails({
           </div>
         </div>
 
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className={`flex items-center justify-center gap-2.5 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm hover:shadow-md ${
-            syncing ? "cursor-not-allowed bg-surface-base text-text-secondary border-border-muted shadow-none" : ""
-          }`}
-        >
-          {!syncing && (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="h-3.5 w-3.5"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-          )}
-          {syncing ? "Syncing..." : "Sync GitHub Data"}
-        </button>
+        {isOwner && (
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className={`flex items-center justify-center gap-2.5 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm hover:shadow-md ${
+              syncing ? "cursor-not-allowed bg-surface-base text-text-secondary border-border-muted shadow-none" : ""
+            }`}
+          >
+            {!syncing && (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="h-3.5 w-3.5"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            )}
+            {syncing ? "Syncing..." : "Sync GitHub Data"}
+          </button>
+        )}
       </div>
 
       {/* Repo quick metadata */}
@@ -422,33 +500,43 @@ export default function RepoDetails({
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative z-10">
           <div className="flex-1">
-            <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-2">HANDOVER</span>
+            <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-2">
+              {isOwner ? "HANDOVER" : "REVIVAL BRIEF"}
+            </span>
             <h3 className="text-lg font-outfit text-text-primary font-bold mb-2">
-              Prepare this repository for the next developer.
+              {isOwner ? "Prepare this repository for the next developer." : "Handover context from the owner."}
             </h3>
             <p className="text-xs text-text-secondary font-sans leading-relaxed max-w-2xl">
-              Create a structured handover that explains the project, important areas, current state, and things the next developer should know.
+              {isOwner
+                ? "Create a structured handover that explains the project, important areas, current state, and things the next developer should know."
+                : "Read the custom developer notes and revival intent to understand what you are inheriting."}
             </p>
           </div>
 
           <div className="shrink-0 flex items-center gap-3">
-            {handoverState === "prepared" ? (
-              <div className="flex items-center gap-2 text-semantic-healthy font-mono text-[10px] uppercase font-bold border border-semantic-healthy/20 bg-semantic-healthy/5 px-3 py-1.5 rounded-none">
-                <span className="h-1.5 w-1.5 rounded-full bg-semantic-healthy" />
-                Prepared
-              </div>
-            ) : handoverState === "in_progress" ? (
-              <div className="flex items-center gap-2 text-brand-accent font-mono text-[10px] uppercase font-bold border border-brand-accent/20 bg-brand-accent/5 px-3 py-1.5 rounded-none animate-pulse">
-                <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
-                In Progress
-              </div>
-            ) : null}
+            {isOwner && (
+              <>
+                {handoverState === "prepared" ? (
+                  <div className="flex items-center gap-2 text-semantic-healthy font-mono text-[10px] uppercase font-bold border border-semantic-healthy/20 bg-semantic-healthy/5 px-3 py-1.5 rounded-none">
+                    <span className="h-1.5 w-1.5 rounded-full bg-semantic-healthy" />
+                    Prepared
+                  </div>
+                ) : handoverState === "in_progress" ? (
+                  <div className="flex items-center gap-2 text-brand-accent font-mono text-[10px] uppercase font-bold border border-brand-accent/20 bg-brand-accent/5 px-3 py-1.5 rounded-none animate-pulse">
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
+                    In Progress
+                  </div>
+                ) : null}
+              </>
+            )}
 
             <button
               onClick={() => setShowHandover(true)}
               className="flex items-center justify-center gap-2 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
             >
-              {handoverState === "not_started" ? "Prepare Handover" : "View Handover"}
+              {isOwner
+                ? handoverState === "not_started" ? "Prepare Handover" : "View Handover"
+                : "Read Revival Brief"}
             </button>
           </div>
         </div>
