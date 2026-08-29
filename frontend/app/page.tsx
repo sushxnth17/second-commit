@@ -29,7 +29,6 @@ export default function Home() {
       const storedStates = localStorage.getItem("secondcommit_handover_states");
       const storedNotes = localStorage.getItem("secondcommit_developer_notes");
       const storedIntents = localStorage.getItem("secondcommit_revival_intents");
-      const storedPublications = localStorage.getItem("secondcommit_publication_states");
       if (storedStates) {
         try {
           setHandoverStates(JSON.parse(storedStates));
@@ -51,29 +50,24 @@ export default function Home() {
           console.error("Failed to parse revival intents:", e);
         }
       }
-      if (storedPublications) {
-        try {
-          setPublicationStates(JSON.parse(storedPublications));
-        } catch (e) {
-          console.error("Failed to parse publication states:", e);
-        }
-      }
     }
   }, []);
 
-  const updateHandoverState = (repoId: number, state: "not_started" | "in_progress" | "prepared") => {
+  const updateHandoverState = async (repoId: number, state: "not_started" | "in_progress" | "prepared") => {
+    // When editing (state === in_progress), set publication state back to unpublished on success
+    if (state === "in_progress") {
+      try {
+        await api.unpublishRepository(repoId);
+        setPublicationStates((prev) => ({ ...prev, [repoId]: "unpublished" as const }));
+      } catch (err: any) {
+        console.error("Failed to unpublish on backend when editing handover:", err);
+        throw err;
+      }
+    }
+
     const updated = { ...handoverStates, [repoId]: state };
     setHandoverStates(updated);
     localStorage.setItem("secondcommit_handover_states", JSON.stringify(updated));
-
-    // When editing (state === in_progress), set publication state back to unpublished
-    if (state === "in_progress") {
-      setPublicationStates((prev) => {
-        const next = { ...prev, [repoId]: "unpublished" as const };
-        localStorage.setItem("secondcommit_publication_states", JSON.stringify(next));
-        return next;
-      });
-    }
   };
 
   const updateDeveloperNotes = (repoId: number, notes: string) => {
@@ -88,10 +82,18 @@ export default function Home() {
     localStorage.setItem("secondcommit_revival_intents", JSON.stringify(updated));
   };
 
-  const updatePublicationState = (repoId: number, status: "unpublished" | "published") => {
-    const updated = { ...publicationStates, [repoId]: status };
-    setPublicationStates(updated);
-    localStorage.setItem("secondcommit_publication_states", JSON.stringify(updated));
+  const updatePublicationState = async (repoId: number, status: "unpublished" | "published") => {
+    try {
+      if (status === "published") {
+        await api.publishRepository(repoId);
+      } else {
+        await api.unpublishRepository(repoId);
+      }
+      setPublicationStates((prev) => ({ ...prev, [repoId]: status }));
+    } catch (err: any) {
+      console.error(`Failed to update publication state to ${status}:`, err);
+      throw err;
+    }
   };
 
   // Authenticate user on mount
@@ -101,6 +103,13 @@ export default function Home() {
       setUser(res.user);
       setRepos(res.repositories);
       
+      // Sync publication states from the backend
+      const initialPubStates: Record<number, "unpublished" | "published"> = {};
+      res.repositories.forEach((repo) => {
+        initialPubStates[repo.id] = repo.published ? "published" : "unpublished";
+      });
+      setPublicationStates(initialPubStates);
+
       const analyticsRes = await api.getAnalytics();
       setAnalytics(analyticsRes);
     } catch (err: any) {

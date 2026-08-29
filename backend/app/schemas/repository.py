@@ -18,6 +18,7 @@ class RepositoryBase(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     pushed_at: datetime | None = None
+    published: bool = False
 
 
 class RepositoryResponse(RepositoryBase):

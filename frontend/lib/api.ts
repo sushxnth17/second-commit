@@ -21,6 +21,7 @@ export interface RepositorySummary {
   health_score?: number;
   health_grade?: string;
   dormancy_status?: string;
+  published?: boolean;
 }
 
 export interface RepositoryResponse {
@@ -40,6 +41,7 @@ export interface RepositoryResponse {
   created_at: string | null;
   updated_at: string | null;
   pushed_at: string | null;
+  published: boolean;
 }
 
 export interface DashboardResponse {
@@ -187,5 +189,19 @@ export const api = {
   // AI Insights
   getRepositoryAIInsights(id: number): Promise<AIInsightsResponse> {
     return request<AIInsightsResponse>(`/repositories/${id}/ai-insights`);
+  },
+
+  // Publish repository
+  publishRepository(id: number): Promise<RepositoryResponse> {
+    return request<RepositoryResponse>(`/repositories/${id}/publish`, {
+      method: "POST",
+    });
+  },
+
+  // Unpublish repository
+  unpublishRepository(id: number): Promise<RepositoryResponse> {
+    return request<RepositoryResponse>(`/repositories/${id}/unpublish`, {
+      method: "POST",
+    });
   },
 };

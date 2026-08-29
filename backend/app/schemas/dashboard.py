@@ -26,6 +26,7 @@ class RepositorySummary(BaseModel):
     pushed_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    published: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -182,3 +182,65 @@ async def sync_repository(
     )
 
     return updated_repository
+
+
+@router.post("/{repository_id}/publish", response_model=RepositoryResponse)
+async def publish_repository(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = (
+        db.query(Repository)
+        .filter(Repository.id == repository_id)
+        .first()
+    )
+
+    if not repository:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    if repository.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Repository owned by another user",
+        )
+
+    repository.published = True
+    db.commit()
+    db.refresh(repository)
+
+    return repository
+
+
+@router.post("/{repository_id}/unpublish", response_model=RepositoryResponse)
+async def unpublish_repository(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = (
+        db.query(Repository)
+        .filter(Repository.id == repository_id)
+        .first()
+    )
+
+    if not repository:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    if repository.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Repository owned by another user",
+        )
+
+    repository.published = False
+    db.commit()
+    db.refresh(repository)
+
+    return repository

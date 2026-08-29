@@ -18,10 +18,10 @@ interface HandoverPageProps {
   developerNotes: string;
   revivalIntent: string;
   publicationState: "unpublished" | "published";
-  onStateChange: (state: "not_started" | "in_progress" | "prepared") => void;
+  onStateChange: (state: "not_started" | "in_progress" | "prepared") => Promise<void> | void;
   onNotesChange: (notes: string) => void;
   onRevivalIntentChange: (intent: string) => void;
-  onPublicationStateChange: (status: "unpublished" | "published") => void;
+  onPublicationStateChange: (status: "unpublished" | "published") => Promise<void> | void;
 }
 
 interface GithubContentItem {
@@ -101,6 +101,7 @@ export default function HandoverPage({
   const [loadingReadme, setLoadingReadme] = useState(false);
   const [loadingStructure, setLoadingStructure] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Fetch README and file listings on mount or repo change
   useEffect(() => {
@@ -618,24 +619,47 @@ export default function HandoverPage({
 
                 {publicationState === "published" ? (
                   <button
-                    onClick={() => onPublicationStateChange("unpublished")}
-                    className="flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm"
+                    disabled={isPublishing}
+                    onClick={async () => {
+                      setIsPublishing(true);
+                      setValidationError(null);
+                      try {
+                        await onPublicationStateChange("unpublished");
+                      } catch (err: any) {
+                        setValidationError(err.message || "Failed to unpublish repository.");
+                      } finally {
+                        setIsPublishing(false);
+                      }
+                    }}
+                    className={`flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm ${
+                      isPublishing ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                    }`}
                   >
-                    Unpublish Project
+                    {isPublishing ? "Unpublishing..." : "Unpublish Project"}
                   </button>
                 ) : (
                   <button
-                    onClick={() => {
+                    disabled={isPublishing}
+                    onClick={async () => {
                       if (!revivalIntent) {
                         setValidationError("Revival Intent must be selected before publishing the project.");
                       } else {
+                        setIsPublishing(true);
                         setValidationError(null);
-                        onPublicationStateChange("published");
+                        try {
+                          await onPublicationStateChange("published");
+                        } catch (err: any) {
+                          setValidationError(err.message || "Failed to publish repository.");
+                        } finally {
+                          setIsPublishing(false);
+                        }
                       }
                     }}
-                    className="flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm hover:shadow-md"
+                    className={`flex items-center justify-center gap-2.5 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-brand-accent shadow-sm hover:shadow-md ${
+                      isPublishing ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                    }`}
                   >
-                    Publish Project
+                    {isPublishing ? "Publishing..." : "Publish Project"}
                   </button>
                 )}
               </div>
@@ -1245,21 +1269,45 @@ export default function HandoverPage({
           )}
           <div className="flex gap-4">
             <button
-              onClick={() => onStateChange("in_progress")}
-              className="flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
-            >
-              Edit Handover
-            </button>
-            <button
-              onClick={() => {
-                if (confirm("Are you sure you want to reset the handover? This will clear all developer notes and the revival intent.")) {
-                  onNotesChange("");
-                  onRevivalIntentChange("");
-                  onPublicationStateChange("unpublished");
-                  onStateChange("not_started");
+              disabled={isPublishing}
+              onClick={async () => {
+                setIsPublishing(true);
+                setValidationError(null);
+                try {
+                  await onStateChange("in_progress");
+                } catch (err: any) {
+                  setValidationError(err.message || "Failed to edit handover. Unpublishing failed.");
+                } finally {
+                  setIsPublishing(false);
                 }
               }}
-              className="flex items-center justify-center gap-2.5 rounded-none border border-semantic-critical/20 bg-surface-base text-semantic-critical hover:bg-semantic-critical/5 px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+              className={`flex items-center justify-center gap-2.5 rounded-none border border-border-strong bg-surface-secondary text-text-secondary hover:text-text-primary hover:border-text-primary px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-brand-accent ${
+                isPublishing ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              }`}
+            >
+              {isPublishing ? "Processing..." : "Edit Handover"}
+            </button>
+            <button
+              disabled={isPublishing}
+              onClick={async () => {
+                if (confirm("Are you sure you want to reset the handover? This will clear all developer notes and the revival intent.")) {
+                  setIsPublishing(true);
+                  setValidationError(null);
+                  try {
+                    await onPublicationStateChange("unpublished");
+                    onNotesChange("");
+                    onRevivalIntentChange("");
+                    await onStateChange("not_started");
+                  } catch (err: any) {
+                    setValidationError(err.message || "Failed to reset handover. Unpublishing failed.");
+                  } finally {
+                    setIsPublishing(false);
+                  }
+                }
+              }}
+              className={`flex items-center justify-center gap-2.5 rounded-none border border-semantic-critical/20 bg-surface-base text-semantic-critical hover:bg-semantic-critical/5 px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-brand-accent ${
+                isPublishing ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              }`}
             >
               Reset Handover
             </button>

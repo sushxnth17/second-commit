@@ -109,6 +109,7 @@ def test_get_repositories_endpoint(client, db_session):
         "created_at",
         "updated_at",
         "pushed_at",
+        "published",
     }
     assert set(repo_data.keys()) == expected_keys
 
@@ -749,3 +750,82 @@ def test_sync_repository_error_sanitization(client, db_session, test_user, mocke
     assert data["detail"] == "GitHub service is temporarily unavailable. Please try again later."
     assert "secret_token" not in response.text
     assert "SHOULD_NOT_LEAK" not in response.text
+
+
+def test_repository_starts_unpublished(db_session, test_repo):
+    # The default state should be False (unpublished)
+    assert test_repo.published is False
+
+
+def test_owner_can_publish_unpublish_repository(client, db_session, test_user, test_repo):
+    # 1. Publish repository
+    response = client.post(f"/repositories/{test_repo.id}/publish")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == test_repo.id
+    assert data["published"] is True
+
+    # Check database status
+    db_session.refresh(test_repo)
+    assert test_repo.published is True
+
+    # 2. Unpublish repository
+    response = client.post(f"/repositories/{test_repo.id}/unpublish")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == test_repo.id
+    assert data["published"] is False
+
+    # Check database status
+    db_session.refresh(test_repo)
+    assert test_repo.published is False
+
+
+def test_other_user_cannot_publish_unpublish_repository(client, db_session, test_repo, auth_context):
+    from app.services.user_service import create_user
+    # Create another user
+    other_user = create_user(
+        db=db_session,
+        github_id=67890,
+        username="otheruser",
+        name="Other User",
+        avatar_url="https://avatar.url/other",
+        access_token="other_token",
+    )
+
+    # Set auth context to other_user
+    auth_context.user = other_user
+
+    # Try publishing owner's repository
+    response = client.post(f"/repositories/{test_repo.id}/publish")
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Repository owned by another user"
+
+    # Try unpublishing owner's repository
+    response = client.post(f"/repositories/{test_repo.id}/unpublish")
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Repository owned by another user"
+
+
+def test_unauthenticated_user_cannot_publish_unpublish_repository(client, test_repo, auth_context):
+    # Set auth context to None (explicitly unauthenticated)
+    auth_context.user = None
+
+    response = client.post(f"/repositories/{test_repo.id}/publish")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+
+    response = client.post(f"/repositories/{test_repo.id}/unpublish")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+
+
+def test_publication_endpoint_not_found(client, db_session, test_user):
+    # Repository does not exist
+    response = client.post("/repositories/99999/publish")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Repository not found"
+
+    response = client.post("/repositories/99999/unpublish")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Repository not found"

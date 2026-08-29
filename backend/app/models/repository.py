@@ -40,6 +40,8 @@ class Repository(Base):
 
     pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    published: Mapped[bool] = mapped_column(default=False)
+
     owner_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"),
         index=True

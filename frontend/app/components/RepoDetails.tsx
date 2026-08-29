@@ -18,10 +18,10 @@ interface RepoDetailsProps {
   developerNotes: string;
   revivalIntent: string;
   publicationState: "unpublished" | "published";
-  onStateChange: (state: "not_started" | "in_progress" | "prepared") => void;
+  onStateChange: (state: "not_started" | "in_progress" | "prepared") => Promise<void> | void;
   onNotesChange: (notes: string) => void;
   onRevivalIntentChange: (intent: string) => void;
-  onPublicationStateChange: (status: "unpublished" | "published") => void;
+  onPublicationStateChange: (status: "unpublished" | "published") => Promise<void> | void;
 }
 
 export default function RepoDetails({
