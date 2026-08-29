@@ -92,6 +92,24 @@ async def list_user_repositories(
     return get_repositories_by_owner(db, current_user.id)
 
 
+@router.get("/discover", response_model=list[RepositoryResponse])
+async def discover_repositories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get all published repositories.
+    Sorted by ID descending (newest first).
+    """
+    repositories = (
+        db.query(Repository)
+        .filter(Repository.published == True)
+        .order_by(Repository.id.desc())
+        .all()
+    )
+    return repositories
+
+
 @router.get("/{repository_id}", response_model=RepositoryResponse)
 async def get_repository(
     repository_id: int,

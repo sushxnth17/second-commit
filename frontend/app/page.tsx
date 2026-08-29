@@ -6,12 +6,13 @@ import Navbar from "./components/Navbar";
 import Dashboard from "./components/Dashboard";
 import RepoDetails from "./components/RepoDetails";
 import ImportModal from "./components/ImportModal";
+import DiscoverPage from "./components/DiscoverPage";
 
 export default function Home() {
   const [user, setUser] = useState<UserSummary | null>(null);
   const [repos, setRepos] = useState<RepositorySummary[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "analytics">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "analytics" | "discover">("dashboard");
   const [selectedRepoId, setSelectedRepoId] = useState<number | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -311,39 +312,42 @@ export default function Home() {
       <Navbar
         user={user}
         activeTab={activeTab}
-        setActiveTab={(tab: "dashboard" | "analytics") => {
+        setActiveTab={(tab: "dashboard" | "analytics" | "discover") => {
           setActiveTab(tab);
-          setSelectedRepoId(null); // Clear selected repo when switching tabs
+          setSelectedRepoId(null);
         }}
         onLogout={handleLogout}
       />
 
       <main className="flex-1">
-        {activeTab === "dashboard" ? (
-          selectedRepoId !== null ? (
-            <RepoDetails
-              repoId={selectedRepoId}
-              onBack={() => setSelectedRepoId(null)}
-              onSyncSuccess={checkAuth}
-              handoverState={handoverStates[selectedRepoId] || "not_started"}
-              developerNotes={developerNotes[selectedRepoId] || ""}
-              revivalIntent={revivalIntents[selectedRepoId] || ""}
-              publicationState={publicationStates[selectedRepoId] || "unpublished"}
-              onStateChange={(state) => updateHandoverState(selectedRepoId, state)}
-              onNotesChange={(notes) => updateDeveloperNotes(selectedRepoId, notes)}
-              onRevivalIntentChange={(intent) => updateRevivalIntent(selectedRepoId, intent)}
-              onPublicationStateChange={(status) => updatePublicationState(selectedRepoId, status)}
-            />
-          ) : (
-            <Dashboard
-              user={user}
-              repos={repos}
-              analytics={analytics}
-              onImportClick={() => setShowImportModal(true)}
-              onSelectRepo={setSelectedRepoId}
-              onSyncSuccess={checkAuth}
-            />
-          )
+        {selectedRepoId !== null ? (
+          <RepoDetails
+            repoId={selectedRepoId}
+            onBack={() => {
+              setSelectedRepoId(null);
+              checkAuth(); // Refresh lists when going back
+            }}
+            onSyncSuccess={checkAuth}
+            handoverState={handoverStates[selectedRepoId] || "not_started"}
+            developerNotes={developerNotes[selectedRepoId] || ""}
+            revivalIntent={revivalIntents[selectedRepoId] || ""}
+            publicationState={publicationStates[selectedRepoId] || "unpublished"}
+            onStateChange={(state) => updateHandoverState(selectedRepoId, state)}
+            onNotesChange={(notes) => updateDeveloperNotes(selectedRepoId, notes)}
+            onRevivalIntentChange={(intent) => updateRevivalIntent(selectedRepoId, intent)}
+            onPublicationStateChange={(status) => updatePublicationState(selectedRepoId, status)}
+          />
+        ) : activeTab === "dashboard" ? (
+          <Dashboard
+            user={user}
+            repos={repos}
+            analytics={analytics}
+            onImportClick={() => setShowImportModal(true)}
+            onSelectRepo={setSelectedRepoId}
+            onSyncSuccess={checkAuth}
+          />
+        ) : activeTab === "discover" ? (
+          <DiscoverPage onSelectRepo={setSelectedRepoId} />
         ) : (
           /* Analytics Tab Panel */
           <div className="mx-auto max-w-5xl px-6 py-10 select-none">

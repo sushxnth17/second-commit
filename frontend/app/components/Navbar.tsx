@@ -4,8 +4,8 @@ import { UserSummary } from "@/lib/api";
 
 interface NavbarProps {
   user: UserSummary;
-  activeTab: "dashboard" | "analytics";
-  setActiveTab: (tab: "dashboard" | "analytics") => void;
+  activeTab: "dashboard" | "analytics" | "discover";
+  setActiveTab: (tab: "dashboard" | "analytics" | "discover") => void;
   onLogout: () => void;
 }
 
@@ -41,6 +41,16 @@ export default function Navbar({
                 }`}
               >
                 Dashboard
+              </button>
+              <button
+                onClick={() => setActiveTab("discover")}
+                className={`flex items-center h-full text-[10px] font-mono uppercase tracking-widest transition-all border-b-2 pt-0.5 cursor-pointer outline-none ${
+                  activeTab === "discover"
+                    ? "border-brand-accent text-brand-accent font-bold"
+                    : "border-transparent text-text-secondary hover:text-brand-accent"
+                }`}
+              >
+                Discover
               </button>
               <button
                 onClick={() => setActiveTab("analytics")}

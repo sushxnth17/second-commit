@@ -24,6 +24,12 @@ export interface RepositorySummary {
   published?: boolean;
 }
 
+export interface OwnerSummary {
+  username: string;
+  name: string | null;
+  avatar_url: string | null;
+}
+
 export interface RepositoryResponse {
   id: number;
   github_repo_id: number;
@@ -42,6 +48,7 @@ export interface RepositoryResponse {
   updated_at: string | null;
   pushed_at: string | null;
   published: boolean;
+  owner?: OwnerSummary | null;
 }
 
 export interface DashboardResponse {
@@ -203,5 +210,10 @@ export const api = {
     return request<RepositoryResponse>(`/repositories/${id}/unpublish`, {
       method: "POST",
     });
+  },
+
+  // Discover repositories
+  discoverRepositories(): Promise<RepositoryResponse[]> {
+    return request<RepositoryResponse[]>("/repositories/discover");
   },
 };

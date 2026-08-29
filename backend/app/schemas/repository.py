@@ -21,7 +21,16 @@ class RepositoryBase(BaseModel):
     published: bool = False
 
 
+class OwnerSummary(BaseModel):
+    username: str
+    name: str | None = None
+    avatar_url: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class RepositoryResponse(RepositoryBase):
     id: int
+    owner: OwnerSummary | None = None
 
     model_config = ConfigDict(from_attributes=True)

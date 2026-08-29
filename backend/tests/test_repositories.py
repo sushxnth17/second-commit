@@ -110,6 +110,7 @@ def test_get_repositories_endpoint(client, db_session):
         "updated_at",
         "pushed_at",
         "published",
+        "owner",
     }
     assert set(repo_data.keys()) == expected_keys
 
@@ -829,3 +830,99 @@ def test_publication_endpoint_not_found(client, db_session, test_user):
     response = client.post("/repositories/99999/unpublish")
     assert response.status_code == 404
     assert response.json()["detail"] == "Repository not found"
+
+
+def test_discover_repositories(client, db_session, test_user):
+    from app.services.repository_service import create_repository
+    # Create two repositories: one published, one unpublished
+    repo_published = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 301,
+            "name": "repo-published",
+            "full_name": "testuser/repo-published",
+            "description": "This is published",
+            "html_url": "https://github.com/testuser/repo-published",
+            "language": "Python",
+            "default_branch": "main",
+        },
+    )
+    repo_published.published = True
+    db_session.commit()
+
+    repo_unpublished = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 302,
+            "name": "repo-unpublished",
+            "full_name": "testuser/repo-unpublished",
+            "description": "This is unpublished",
+            "html_url": "https://github.com/testuser/repo-unpublished",
+            "language": "Python",
+            "default_branch": "main",
+        },
+    )
+
+    # Call discover endpoint
+    response = client.get("/repositories/discover")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Assertions
+    assert len(data) == 1
+    assert data[0]["id"] == repo_published.id
+    assert data[0]["published"] is True
+    assert data[0]["owner"]["username"] == test_user.username
+    assert data[0]["owner"]["avatar_url"] == test_user.avatar_url
+
+
+def test_discover_repositories_ordering(client, db_session, test_user):
+    from app.services.repository_service import create_repository
+    # Create multiple published repositories
+    repo1 = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 401,
+            "name": "repo-first",
+            "full_name": "testuser/repo-first",
+            "html_url": "https://github.com/testuser/repo-first",
+            "default_branch": "main",
+        },
+    )
+    repo1.published = True
+
+    repo2 = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 402,
+            "name": "repo-second",
+            "full_name": "testuser/repo-second",
+            "html_url": "https://github.com/testuser/repo-second",
+            "default_branch": "main",
+        },
+    )
+    repo2.published = True
+    db_session.commit()
+
+    # Call discover
+    response = client.get("/repositories/discover")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Assertions: sorted by ID desc (newest first, repo2 then repo1)
+    assert len(data) == 2
+    assert data[0]["id"] == repo2.id
+    assert data[1]["id"] == repo1.id
+
+
+def test_discover_repositories_unauthenticated(client, auth_context):
+    # Set auth context to None (explicitly unauthenticated)
+    auth_context.user = None
+
+    response = client.get("/repositories/discover")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
