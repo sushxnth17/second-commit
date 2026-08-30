@@ -520,17 +520,17 @@ second-commit/
 - [x] Create GitHub OAuth application
 - [x] Implement GitHub login
 - [x] Handle OAuth callback
-- [ ] Create users from GitHub identity
-- [ ] Implement authenticated sessions
-- [ ] Create basic user profile
+- [x] Create users from GitHub identity
+- [x] Implement authenticated sessions
+- [x] Create basic user profile
 
 ### Phase 3: Repository Import
 
-- [ ] Fetch authenticated user's repositories
-- [ ] Display repository selection
-- [ ] Fetch repository metadata
-- [ ] Import selected repository
-- [ ] Store required repository information
+- [x] Fetch authenticated user's repositories
+- [x] Display repository selection
+- [x] Fetch repository metadata
+- [x] Import selected repository
+- [x] Store required repository information
 
 ### Phase 4: Revival Brief
 
