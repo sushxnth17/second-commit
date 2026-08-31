@@ -441,3 +441,31 @@ async def get_my_pending_revival_request(
         .first()
     )
     return request
+
+
+@router.get("/{repository_id}/revival-requests", response_model=list[RevivalRequestResponse])
+async def list_revival_requests(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    if repository.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    requests = (
+        db.query(RevivalRequest)
+        .filter(RevivalRequest.repository_id == repository_id)
+        .order_by(RevivalRequest.created_at.desc())
+        .all()
+    )
+    return requests

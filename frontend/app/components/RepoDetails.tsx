@@ -49,6 +49,11 @@ export default function RepoDetails({
   const [requestError, setRequestError] = useState<string | null>(null);
   const [showRequestForm, setShowRequestForm] = useState(false);
 
+  // Owner requests list states
+  const [incomingRequests, setIncomingRequests] = useState<RevivalRequestResponse[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
+
   const fetchData = async () => {
     setLoading(true);
     setError(null);
@@ -81,6 +86,19 @@ export default function RepoDetails({
         setRequestingState("already_requested");
       } else {
         setRequestingState("idle");
+      }
+
+      if (isOwner) {
+        setLoadingRequests(true);
+        setRequestsError(null);
+        try {
+          const reqs = await api.getRevivalRequests(repoId);
+          setIncomingRequests(reqs);
+        } catch (err: any) {
+          setRequestsError(err.message || "Failed to load revival requests.");
+        } finally {
+          setLoadingRequests(false);
+        }
       }
     } catch (err: any) {
       setError(err.message || "Failed to fetch repository details.");
@@ -653,6 +671,108 @@ export default function RepoDetails({
           )}
         </div>
       </div>
+
+      {/* Owner-only Revival Requests Section */}
+      {isOwner && (
+        <div className="border border-border-muted bg-surface-base p-8 mb-10 shadow-sm mt-10">
+          <div className="border-b border-border-muted pb-4 mb-6 select-none flex justify-between items-baseline">
+            <div>
+              <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-1">
+                REVIVAL REQUESTS
+              </span>
+              <p className="text-xs text-text-secondary font-sans leading-relaxed">
+                Developers interested in continuing this project
+              </p>
+            </div>
+            {incomingRequests.length > 0 && (
+              <span className="rounded-none border border-brand-accent/30 bg-brand-accent/10 text-brand-accent px-2 py-0.5 text-[9px] font-mono uppercase font-bold">
+                {incomingRequests.length} {incomingRequests.length === 1 ? "REQUEST" : "REQUESTS"}
+              </span>
+            )}
+          </div>
+
+          {loadingRequests ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-3 select-none">
+              <div className="flex items-center gap-1.5">
+                <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse" />
+                <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse [animation-delay:0.2s]" />
+                <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse [animation-delay:0.4s]" />
+              </div>
+              <span className="text-[10px] font-mono uppercase text-text-muted">Loading requests</span>
+            </div>
+          ) : requestsError ? (
+            <div className="border border-semantic-critical/20 bg-semantic-critical/5 p-6 text-center">
+              <span className="text-[10px] font-mono uppercase text-semantic-critical font-bold">Failed to load requests</span>
+              <p className="text-xs text-text-secondary mt-1.5">{requestsError}</p>
+            </div>
+          ) : incomingRequests.length === 0 ? (
+            <div className="border border-dashed border-border-strong py-10 px-6 text-center select-none bg-surface-secondary/20">
+              <h4 className="text-xs font-mono uppercase tracking-widest text-text-muted font-bold">
+                NO REVIVAL REQUESTS YET
+              </h4>
+              <p className="text-[11px] text-text-secondary font-sans mt-2 max-w-md mx-auto">
+                When developers discover and request to revive the project, their requests will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {incomingRequests.map((request) => {
+                const requester = request.requester;
+                const requesterName = requester ? (requester.name || requester.username) : "Developer";
+                const requesterAvatar = requester?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${requesterName}`;
+                const createdDate = new Date(request.created_at).toLocaleDateString(undefined, {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                });
+
+                return (
+                  <div key={request.id} className="border border-border-muted p-5 bg-surface-secondary/15 flex flex-col md:flex-row gap-5 items-start md:items-center justify-between animate-fade-in">
+                    <div className="flex-1">
+                      {/* Requester Info Header */}
+                      <div className="flex items-center gap-3 mb-3 select-none">
+                        <img
+                          src={requesterAvatar}
+                          alt={requesterName}
+                          className="h-8 w-8 rounded-full border border-border-muted object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${requesterName}`;
+                          }}
+                        />
+                        <div>
+                          <strong className="text-xs font-outfit text-text-primary block font-bold">
+                            {requesterName}
+                          </strong>
+                          {requester?.username && (
+                            <span className="text-[10px] font-mono text-text-muted block">
+                              @{requester.username.toLowerCase()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Request Message */}
+                      <blockquote className="text-xs text-text-secondary bg-surface-base border-l-2 border-brand-accent/50 pl-3 py-1 font-sans leading-relaxed select-text whitespace-pre-wrap">
+                        {request.message || <span className="text-text-muted italic">No message attached to request.</span>}
+                      </blockquote>
+                    </div>
+
+                    {/* Metadata & Status */}
+                    <div className="flex flex-col items-start md:items-end gap-1.5 shrink-0 select-none">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider text-brand-accent border border-brand-accent/20 bg-brand-accent/5">
+                        PENDING
+                      </span>
+                      <span className="text-[10px] font-mono text-text-muted">
+                        Requested: {createdDate}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
