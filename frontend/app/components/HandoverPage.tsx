@@ -1289,9 +1289,19 @@ export default function HandoverPage({
               </div>
 
               <div className="shrink-0 flex items-center gap-3">
-                {requestingState === "already_requested" || pendingRequest ? (
-                  <div className="flex items-center justify-center gap-2 rounded-none border border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy px-5 py-3 text-[10px] font-mono uppercase font-bold select-none">
-                    REQUEST ALREADY SENT
+                {pendingRequest ? (
+                  <div className={`flex items-center justify-center gap-2 rounded-none border px-5 py-3 text-[10px] font-mono uppercase font-bold select-none ${
+                    pendingRequest.status === "approved"
+                      ? "border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy"
+                      : pendingRequest.status === "rejected"
+                      ? "border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical"
+                      : "border-brand-accent/20 bg-brand-accent/5 text-brand-accent"
+                  }`}>
+                    {pendingRequest.status === "approved"
+                      ? "REVIVAL REQUEST APPROVED"
+                      : pendingRequest.status === "rejected"
+                      ? "REVIVAL REQUEST REJECTED"
+                      : "REVIVAL REQUEST PENDING"}
                   </div>
                 ) : requestingState === "success" ? (
                   <div className="flex items-center justify-center gap-2 rounded-none border border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy px-5 py-3 text-[10px] font-mono uppercase font-bold select-none">
@@ -1345,7 +1355,40 @@ export default function HandoverPage({
               </div>
             )}
 
-            {requestingState === "success" && (
+            {pendingRequest && (
+              <div className={`border-t border-border-muted pt-4 mt-2 select-text text-xs font-sans leading-relaxed flex items-center gap-2 animate-fade-in ${
+                pendingRequest.status === "approved"
+                  ? "text-semantic-healthy"
+                  : pendingRequest.status === "rejected"
+                  ? "text-semantic-critical"
+                  : "text-brand-accent"
+              }`}>
+                {pendingRequest.status === "approved" ? (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-healthy">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Your request to revive this project has been approved by the owner.</span>
+                  </>
+                ) : pendingRequest.status === "rejected" ? (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-critical">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Your request to revive this project was declined by the owner.</span>
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-brand-accent">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Your request is currently awaiting review by the owner.</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {!pendingRequest && requestingState === "success" && (
               <div className="border-t border-border-muted pt-4 mt-2 select-text text-xs text-semantic-healthy font-sans leading-relaxed flex items-center gap-2 animate-fade-in">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-healthy">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1356,6 +1399,7 @@ export default function HandoverPage({
           </div>
         </div>
       )}
+
 
       {/* Prepare/Edit controls at the bottom for Prepared state */}
       {isOwner && handoverState === "prepared" && (

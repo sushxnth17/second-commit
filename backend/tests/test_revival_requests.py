@@ -275,3 +275,288 @@ def test_owner_view_revival_requests(client, db_session, test_user, auth_context
     res = client.get(f"/repositories/{repo.id}/revival-requests")
     assert res.status_code == 200
     assert len(res.json()) == 2
+
+
+def test_decision_workflow_approval(client, db_session, test_user, auth_context):
+    dev_b = create_user(
+        db=db_session,
+        github_id=98765,
+        username="devb",
+        name="Developer B",
+        avatar_url="https://avatar.url/b",
+        access_token="token_b",
+    )
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 904,
+            "name": "project-delta",
+            "full_name": "testuser/project-delta",
+            "html_url": "https://github.com/testuser/project-delta",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    # Developer B requests
+    auth_context.user = dev_b
+    res_b = client.post(
+        f"/repositories/{repo.id}/revival-requests",
+        json={"message": "Dev B message"},
+    )
+    assert res_b.status_code == 201
+    request_id = res_b.json()["id"]
+
+    # Check 7. Unauthenticated user cannot approve.
+    auth_context.user = None
+    res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/approve")
+    assert res.status_code == 401
+
+    # Check 5. Other user (Dev B) cannot approve.
+    # Check 6. Requester (Dev B) cannot approve their own request.
+    auth_context.user = dev_b
+    res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/approve")
+    assert res.status_code == 404  # Privacy: owner-only auth check returns 404
+
+    # Check 8. Owner can approve even if repository is unpublished.
+    repo.published = False
+    db_session.commit()
+
+    # Check 1. Owner can approve a pending request.
+    auth_context.user = test_user
+    res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/approve")
+    assert res.status_code == 200
+    data = res.json()
+
+    # Check 3. Response status becomes "approved".
+    assert data["status"] == "approved"
+
+    # Check 4. Requester information remains available.
+    assert data["requester"]["username"] == "devb"
+
+    # Check 2. Approval persists in the database.
+    db_req = db_session.query(RevivalRequest).filter(RevivalRequest.id == request_id).first()
+    assert db_req.status == "approved"
+
+    # Check 16. Approved request cannot be approved again.
+    res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/approve")
+    assert res.status_code == 409
+    assert "already been decided" in res.json()["detail"]
+
+    # Check 17. Approved request cannot be rejected.
+    res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/reject")
+    assert res.status_code == 409
+
+    # Check 20. Wrong repository/request combination returns 404.
+    res = client.post(f"/repositories/99999/revival-requests/{request_id}/approve")
+    assert res.status_code == 404
+
+
+def test_decision_workflow_rejection(client, db_session, test_user, auth_context):
+    dev_b = create_user(
+        db=db_session,
+        github_id=98765,
+        username="devb",
+        name="Developer B",
+        avatar_url="https://avatar.url/b",
+        access_token="token_b",
+    )
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 905,
+            "name": "project-epsilon",
+            "full_name": "testuser/project-epsilon",
+            "html_url": "https://github.com/testuser/project-epsilon",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    # Developer B requests
+    auth_context.user = dev_b
+    res_b = client.post(
+        f"/repositories/{repo.id}/revival-requests",
+        json={"message": "Dev B message"},
+    )
+    assert res_b.status_code == 201
+    request_id = res_b.json()["id"]
+
+    # Check 14. Unauthenticated user cannot reject.
+    auth_context.user = None
+    res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/reject")
+    assert res.status_code == 401
+
+    # Check 12. Other user cannot reject.
+    # Check 13. Requester cannot reject.
+    auth_context.user = dev_b
+    res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/reject")
+    assert res.status_code == 404
+
+    # Check 15. Owner can reject even if repository is unpublished.
+    repo.published = False
+    db_session.commit()
+
+    # Check 9. Owner can reject a pending request.
+    auth_context.user = test_user
+    res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/reject")
+    assert res.status_code == 200
+    data = res.json()
+
+    # Check 11. Response status becomes "rejected".
+    assert data["status"] == "rejected"
+
+    # Check 10. Rejection persists in the database.
+    db_req = db_session.query(RevivalRequest).filter(RevivalRequest.id == request_id).first()
+    assert db_req.status == "rejected"
+
+    # Check 18. Rejected request cannot be approved.
+    res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/approve")
+    assert res.status_code == 409
+
+    # Check 19. Rejected request cannot be rejected again.
+    res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/reject")
+    assert res.status_code == 409
+
+
+def test_developer_request_status_retrieval(client, db_session, test_user, auth_context):
+    dev_b = create_user(
+        db=db_session,
+        github_id=98765,
+        username="devb",
+        name="Developer B",
+        avatar_url="https://avatar.url/b",
+        access_token="token_b",
+    )
+    dev_c = create_user(
+        db=db_session,
+        github_id=98766,
+        username="devc",
+        name="Developer C",
+        avatar_url="https://avatar.url/c",
+        access_token="token_c",
+    )
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 906,
+            "name": "project-zeta",
+            "full_name": "testuser/project-zeta",
+            "html_url": "https://github.com/testuser/project-zeta",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    # Developer B requests
+    auth_context.user = dev_b
+    res_b = client.post(
+        f"/repositories/{repo.id}/revival-requests",
+        json={"message": "Dev B message"},
+    )
+    request_id = res_b.json()["id"]
+
+    # Check 23. Developer can retrieve their own pending request.
+    res = client.get(f"/repositories/{repo.id}/revival-requests/my")
+    assert res.status_code == 200
+    assert res.json()["status"] == "pending"
+
+    # Check 24. Developer cannot retrieve another developer's request.
+    auth_context.user = dev_c
+    res = client.get(f"/repositories/{repo.id}/revival-requests/my")
+    assert res.status_code == 200
+    assert res.json() is None
+
+    # Owner approves Dev B request
+    auth_context.user = test_user
+    client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/approve")
+
+    # Check 21. Developer can retrieve their own approved request.
+    auth_context.user = dev_b
+    res = client.get(f"/repositories/{repo.id}/revival-requests/my")
+    assert res.status_code == 200
+    assert res.json()["status"] == "approved"
+
+
+def test_owner_request_list_all_statuses(client, db_session, test_user, auth_context):
+    dev_b = create_user(
+        db=db_session,
+        github_id=98765,
+        username="devb",
+        name="Developer B",
+        avatar_url="https://avatar.url/b",
+        access_token="token_b",
+    )
+    dev_c = create_user(
+        db=db_session,
+        github_id=98766,
+        username="devc",
+        name="Developer C",
+        avatar_url="https://avatar.url/c",
+        access_token="token_c",
+    )
+    dev_d = create_user(
+        db=db_session,
+        github_id=98767,
+        username="devd",
+        name="Developer D",
+        avatar_url="https://avatar.url/d",
+        access_token="token_d",
+    )
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 907,
+            "name": "project-eta",
+            "full_name": "testuser/project-eta",
+            "html_url": "https://github.com/testuser/project-eta",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    # Three requests
+    auth_context.user = dev_b
+    res_b = client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "B"})
+    req_b_id = res_b.json()["id"]
+
+    auth_context.user = dev_c
+    res_c = client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "C"})
+    req_c_id = res_c.json()["id"]
+
+    auth_context.user = dev_d
+    client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "D"})
+
+    # Owner approves Dev B
+    auth_context.user = test_user
+    client.post(f"/repositories/{repo.id}/revival-requests/{req_b_id}/approve")
+
+    # Owner rejects Dev C
+    client.post(f"/repositories/{repo.id}/revival-requests/{req_c_id}/reject")
+
+    # Owner retrieves requests list
+    res = client.get(f"/repositories/{repo.id}/revival-requests")
+    assert res.status_code == 200
+    list_res = res.json()
+    assert len(list_res) == 3
+
+    # Check 25. Owner request list shows pending requests.
+    # Check 26. Owner request list shows approved requests.
+    # Check 27. Owner request list shows rejected requests.
+    statuses = {item["status"] for item in list_res}
+    assert "pending" in statuses
+    assert "approved" in statuses
+    assert "rejected" in statuses
+
+    # Check 28. Other users cannot retrieve the owner request list.
+    auth_context.user = dev_b
+    res = client.get(f"/repositories/{repo.id}/revival-requests")
+    assert res.status_code == 404

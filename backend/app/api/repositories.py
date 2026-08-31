@@ -469,3 +469,95 @@ async def list_revival_requests(
         .all()
     )
     return requests
+
+
+@router.get("/{repository_id}/revival-requests/my", response_model=RevivalRequestResponse | None)
+async def get_my_revival_request(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    request = (
+        db.query(RevivalRequest)
+        .filter(
+            RevivalRequest.repository_id == repository_id,
+            RevivalRequest.requester_id == current_user.id,
+        )
+        .order_by(RevivalRequest.created_at.desc())
+        .first()
+    )
+
+    if not repository.published and repository.owner_id != current_user.id and not request:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    return request
+
+
+@router.post("/{repository_id}/revival-requests/{request_id}/approve", response_model=RevivalRequestResponse)
+async def approve_revival_request(
+    repository_id: int,
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    if repository.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    request = db.query(RevivalRequest).filter(RevivalRequest.id == request_id).first()
+    if not request or request.repository_id != repository_id:
+        raise HTTPException(status_code=404, detail="Revival request not found")
+
+    if request.status != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail="Revival request has already been decided.",
+        )
+
+    request.status = "approved"
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+@router.post("/{repository_id}/revival-requests/{request_id}/reject", response_model=RevivalRequestResponse)
+async def reject_revival_request(
+    repository_id: int,
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    if repository.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    request = db.query(RevivalRequest).filter(RevivalRequest.id == request_id).first()
+    if not request or request.repository_id != repository_id:
+        raise HTTPException(status_code=404, detail="Revival request not found")
+
+    if request.status != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail="Revival request has already been decided.",
+        )
+
+    request.status = "rejected"
+    db.commit()
+    db.refresh(request)
+    return request

@@ -54,6 +54,14 @@ export default function RepoDetails({
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [requestsError, setRequestsError] = useState<string | null>(null);
 
+  // State to track decision confirmation: { requestId: number, action: "approve" | "reject" | null }
+  const [decisionConfirm, setDecisionConfirm] = useState<{ requestId: number; action: "approve" | "reject" | null }>({
+    requestId: 0,
+    action: null,
+  });
+  // State to track currently updating requests: { [requestId: number]: "approving" | "rejecting" }
+  const [updatingRequests, setUpdatingRequests] = useState<{ [key: number]: "approving" | "rejecting" }>({});
+
   const fetchData = async () => {
     setLoading(true);
     setError(null);
@@ -66,7 +74,7 @@ export default function RepoDetails({
         api.getRepositoryHealth(repoId),
         api.getRepositoryDormancy(repoId),
         api.getHandover(repoId).catch(() => null),
-        api.getMyPendingRevivalRequest(repoId).catch(() => null),
+        api.getMyRevivalRequest(repoId).catch(() => null),
       ]);
       setRepo(r);
       setHealth(h);
@@ -267,6 +275,44 @@ export default function RepoDetails({
     } catch (err: any) {
       setRequestError(err.message || "Failed to submit revival request.");
       setRequestingState("error");
+    }
+  };
+
+  const handleApproveRequest = async (requestId: number) => {
+    setUpdatingRequests((prev) => ({ ...prev, [requestId]: "approving" }));
+    setDecisionConfirm({ requestId: 0, action: null });
+    try {
+      const updated = await api.approveRevivalRequest(repoId, requestId);
+      setIncomingRequests((prev) =>
+        prev.map((req) => (req.id === requestId ? updated : req))
+      );
+    } catch (err: any) {
+      alert(err.message || "Failed to approve request.");
+    } finally {
+      setUpdatingRequests((prev) => {
+        const copy = { ...prev };
+        delete copy[requestId];
+        return copy;
+      });
+    }
+  };
+
+  const handleRejectRequest = async (requestId: number) => {
+    setUpdatingRequests((prev) => ({ ...prev, [requestId]: "rejecting" }));
+    setDecisionConfirm({ requestId: 0, action: null });
+    try {
+      const updated = await api.rejectRevivalRequest(repoId, requestId);
+      setIncomingRequests((prev) =>
+        prev.map((req) => (req.id === requestId ? updated : req))
+      );
+    } catch (err: any) {
+      alert(err.message || "Failed to reject request.");
+    } finally {
+      setUpdatingRequests((prev) => {
+        const copy = { ...prev };
+        delete copy[requestId];
+        return copy;
+      });
     }
   };
 
@@ -598,9 +644,19 @@ export default function RepoDetails({
               {/* Request to Revive button for non-owners */}
               {!isOwner && repo.published && (
                 <>
-                  {requestingState === "already_requested" || pendingRequest ? (
-                    <div className="flex items-center justify-center gap-2 rounded-none border border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy px-5 py-3 text-[10px] font-mono uppercase font-bold select-none">
-                      REQUEST ALREADY SENT
+                  {pendingRequest ? (
+                    <div className={`flex items-center justify-center gap-2 rounded-none border px-5 py-3 text-[10px] font-mono uppercase font-bold select-none ${
+                      pendingRequest.status === "approved"
+                        ? "border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy"
+                        : pendingRequest.status === "rejected"
+                        ? "border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical"
+                        : "border-brand-accent/20 bg-brand-accent/5 text-brand-accent"
+                    }`}>
+                      {pendingRequest.status === "approved"
+                        ? "REVIVAL REQUEST APPROVED"
+                        : pendingRequest.status === "rejected"
+                        ? "REVIVAL REQUEST REJECTED"
+                        : "REVIVAL REQUEST PENDING"}
                     </div>
                   ) : requestingState === "success" ? (
                     <div className="flex items-center justify-center gap-2 rounded-none border border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy px-5 py-3 text-[10px] font-mono uppercase font-bold select-none">
@@ -660,8 +716,41 @@ export default function RepoDetails({
             </div>
           )}
 
-          {/* Success message */}
-          {!isOwner && repo.published && requestingState === "success" && (
+          {/* Developer request status details */}
+          {!isOwner && repo.published && pendingRequest && (
+            <div className={`border-t border-border-muted pt-4 mt-2 select-text text-xs font-sans leading-relaxed flex items-center gap-2 animate-fade-in ${
+              pendingRequest.status === "approved"
+                ? "text-semantic-healthy"
+                : pendingRequest.status === "rejected"
+                ? "text-semantic-critical"
+                : "text-brand-accent"
+            }`}>
+              {pendingRequest.status === "approved" ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-healthy">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Your request to revive this project has been approved by the owner.</span>
+                </>
+              ) : pendingRequest.status === "rejected" ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-critical">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Your request to revive this project was declined by the owner.</span>
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-brand-accent">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Your request is currently awaiting review by the owner.</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {!isOwner && repo.published && !pendingRequest && requestingState === "success" && (
             <div className="border-t border-border-muted pt-4 mt-2 select-text text-xs text-semantic-healthy font-sans leading-relaxed flex items-center gap-2 animate-fade-in">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-healthy">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -757,14 +846,77 @@ export default function RepoDetails({
                       </blockquote>
                     </div>
 
-                    {/* Metadata & Status */}
-                    <div className="flex flex-col items-start md:items-end gap-1.5 shrink-0 select-none">
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider text-brand-accent border border-brand-accent/20 bg-brand-accent/5">
-                        PENDING
-                      </span>
+                    {/* Metadata, Status & Actions */}
+                    <div className="flex flex-col items-start md:items-end gap-3 shrink-0 select-none">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider border ${
+                          request.status === "approved"
+                            ? "text-semantic-healthy border-semantic-healthy/20 bg-semantic-healthy/5"
+                            : request.status === "rejected"
+                            ? "text-semantic-critical border-semantic-critical/20 bg-semantic-critical/5"
+                            : "text-brand-accent border-brand-accent/20 bg-brand-accent/5"
+                        }`}>
+                          {request.status}
+                        </span>
+                      </div>
+
                       <span className="text-[10px] font-mono text-text-muted">
                         Requested: {createdDate}
                       </span>
+
+                      {/* Approve / Reject actions for pending requests */}
+                      {request.status === "pending" && (
+                        <div className="mt-2 flex flex-col md:flex-row gap-2 items-stretch md:items-center">
+                          {decisionConfirm.requestId === request.id && decisionConfirm.action !== null ? (
+                            <div className="flex flex-col gap-2 items-end border border-border-muted p-2.5 bg-surface-secondary/20">
+                              <span className="text-[10px] font-sans text-text-primary">
+                                {decisionConfirm.action === "approve" ? "Approve this revival request?" : "Reject this revival request?"}
+                              </span>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setDecisionConfirm({ requestId: 0, action: null })}
+                                  className="px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider border border-border-strong text-text-secondary bg-surface-base hover:text-text-primary cursor-pointer transition-all"
+                                  disabled={updatingRequests[request.id] !== undefined}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => decisionConfirm.action === "approve" ? handleApproveRequest(request.id) : handleRejectRequest(request.id)}
+                                  className={`px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider text-white cursor-pointer transition-all ${
+                                    decisionConfirm.action === "approve"
+                                      ? "bg-semantic-healthy border border-semantic-healthy hover:bg-emerald-600"
+                                      : "bg-semantic-critical border border-semantic-critical hover:bg-red-600"
+                                  }`}
+                                  disabled={updatingRequests[request.id] !== undefined}
+                                >
+                                  {updatingRequests[request.id] === "approving"
+                                    ? "APPROVING..."
+                                    : updatingRequests[request.id] === "rejecting"
+                                    ? "REJECTING..."
+                                    : decisionConfirm.action === "approve"
+                                    ? "APPROVE"
+                                    : "REJECT"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setDecisionConfirm({ requestId: request.id, action: "approve" })}
+                                className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider bg-semantic-healthy border border-semantic-healthy text-white hover:bg-emerald-600 cursor-pointer shadow-sm transition-all"
+                              >
+                                APPROVE
+                              </button>
+                              <button
+                                onClick={() => setDecisionConfirm({ requestId: request.id, action: "reject" })}
+                                className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-semantic-critical/20 bg-surface-base text-semantic-critical hover:bg-semantic-critical/5 cursor-pointer shadow-sm transition-all"
+                              >
+                                REJECT
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

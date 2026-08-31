@@ -287,8 +287,27 @@ export const api = {
     return request<RevivalRequestResponse | null>(`/repositories/${repositoryId}/revival-requests/my-pending`);
   },
 
+  // Get My Latest Revival Request regardless of status
+  getMyRevivalRequest(repositoryId: number): Promise<RevivalRequestResponse | null> {
+    return request<RevivalRequestResponse | null>(`/repositories/${repositoryId}/revival-requests/my`);
+  },
+
   // Get all Revival Requests (Owner-only)
   getRevivalRequests(repositoryId: number): Promise<RevivalRequestResponse[]> {
     return request<RevivalRequestResponse[]>(`/repositories/${repositoryId}/revival-requests`);
+  },
+
+  // Approve a Revival Request (Owner-only)
+  approveRevivalRequest(repositoryId: number, requestId: number): Promise<RevivalRequestResponse> {
+    return request<RevivalRequestResponse>(`/repositories/${repositoryId}/revival-requests/${requestId}/approve`, {
+      method: "POST",
+    });
+  },
+
+  // Reject a Revival Request (Owner-only)
+  rejectRevivalRequest(repositoryId: number, requestId: number): Promise<RevivalRequestResponse> {
+    return request<RevivalRequestResponse>(`/repositories/${repositoryId}/revival-requests/${requestId}/reject`, {
+      method: "POST",
+    });
   },
 };
