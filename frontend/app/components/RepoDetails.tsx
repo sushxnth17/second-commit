@@ -7,6 +7,7 @@ import {
   HealthResponse,
   DormancyResponse,
   AIInsightsResponse,
+  RevivalRequestResponse,
 } from "@/lib/api";
 import HandoverPage from "./HandoverPage";
 
@@ -41,6 +42,13 @@ export default function RepoDetails({
   const [revivalIntent, setRevivalIntent] = useState("");
   const [publicationState, setPublicationState] = useState<"unpublished" | "published">("unpublished");
 
+  // Revival request states
+  const [pendingRequest, setPendingRequest] = useState<RevivalRequestResponse | null>(null);
+  const [requestMessage, setRequestMessage] = useState("");
+  const [requestingState, setRequestingState] = useState<"idle" | "sending" | "success" | "already_requested" | "error">("idle");
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [showRequestForm, setShowRequestForm] = useState(false);
+
   const fetchData = async () => {
     setLoading(true);
     setError(null);
@@ -48,11 +56,12 @@ export default function RepoDetails({
     setAiLoading(false);
     setAiError(null);
     try {
-      const [r, h, d, brief] = await Promise.all([
+      const [r, h, d, brief, req] = await Promise.all([
         api.getRepository(repoId),
         api.getRepositoryHealth(repoId),
         api.getRepositoryDormancy(repoId),
         api.getHandover(repoId).catch(() => null),
+        api.getMyPendingRevivalRequest(repoId).catch(() => null),
       ]);
       setRepo(r);
       setHealth(h);
@@ -66,6 +75,12 @@ export default function RepoDetails({
         setHandoverState("not_started");
         setDeveloperNotes("");
         setRevivalIntent("");
+      }
+      setPendingRequest(req);
+      if (req) {
+        setRequestingState("already_requested");
+      } else {
+        setRequestingState("idle");
       }
     } catch (err: any) {
       setError(err.message || "Failed to fetch repository details.");
@@ -223,6 +238,20 @@ export default function RepoDetails({
     );
   }
 
+  const handleSendRevivalRequest = async (message: string) => {
+    setRequestingState("sending");
+    setRequestError(null);
+    try {
+      const res = await api.createRevivalRequest(repoId, message);
+      setPendingRequest(res);
+      setRequestingState("success");
+      setShowRequestForm(false);
+    } catch (err: any) {
+      setRequestError(err.message || "Failed to submit revival request.");
+      setRequestingState("error");
+    }
+  };
+
   if (showHandover && repo) {
     return (
       <HandoverPage
@@ -240,6 +269,10 @@ export default function RepoDetails({
         onRevivalIntentChange={handleRevivalIntentChange}
         onPublicationStateChange={handlePublicationStateChange}
         isOwner={isOwner}
+        pendingRequest={pendingRequest}
+        requestingState={requestingState}
+        requestError={requestError}
+        onSendRevivalRequest={handleSendRevivalRequest}
       />
     );
   }
@@ -498,47 +531,126 @@ export default function RepoDetails({
         {/* Subtle background decoration to emphasize the feature */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_100%_0%,rgba(232,121,42,0.04)_0%,transparent_70%)] pointer-events-none" />
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative z-10">
-          <div className="flex-1">
-            <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-2">
-              {isOwner ? "HANDOVER" : "REVIVAL BRIEF"}
-            </span>
-            <h3 className="text-lg font-outfit text-text-primary font-bold mb-2">
-              {isOwner ? "Prepare this repository for the next developer." : "Handover context from the owner."}
-            </h3>
-            <p className="text-xs text-text-secondary font-sans leading-relaxed max-w-2xl">
-              {isOwner
-                ? "Create a structured handover that explains the project, important areas, current state, and things the next developer should know."
-                : "Read the custom developer notes and revival intent to understand what you are inheriting."}
-            </p>
+        <div className="flex flex-col gap-6 relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+            <div className="flex-1">
+              <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-2">
+                {isOwner ? "HANDOVER" : "REVIVAL BRIEF"}
+              </span>
+              <h3 className="text-lg font-outfit text-text-primary font-bold mb-2">
+                {isOwner ? "Prepare this repository for the next developer." : "Handover context from the owner."}
+              </h3>
+              <p className="text-xs text-text-secondary font-sans leading-relaxed max-w-2xl">
+                {isOwner
+                  ? "Create a structured handover that explains the project, important areas, current state, and things the next developer should know."
+                  : "Read the custom developer notes and revival intent to understand what you are inheriting."}
+              </p>
+            </div>
+
+            <div className="shrink-0 flex flex-wrap items-center gap-3">
+              {isOwner && (
+                <>
+                  {handoverState === "prepared" ? (
+                    <div className="flex items-center gap-2 text-semantic-healthy font-mono text-[10px] uppercase font-bold border border-semantic-healthy/20 bg-semantic-healthy/5 px-3 py-1.5 rounded-none">
+                      <span className="h-1.5 w-1.5 rounded-full bg-semantic-healthy" />
+                      Prepared
+                    </div>
+                  ) : handoverState === "in_progress" ? (
+                    <div className="flex items-center gap-2 text-brand-accent font-mono text-[10px] uppercase font-bold border border-brand-accent/20 bg-brand-accent/5 px-3 py-1.5 rounded-none animate-pulse">
+                      <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
+                      In Progress
+                    </div>
+                  ) : null}
+                </>
+              )}
+
+              <button
+                onClick={() => setShowHandover(true)}
+                className={`flex items-center justify-center gap-2 rounded-none px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-brand-accent ${
+                  isOwner
+                    ? "bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent hover:shadow-md"
+                    : "bg-surface-secondary border border-border-strong text-text-primary hover:bg-surface-base"
+                }`}
+              >
+                {isOwner
+                  ? handoverState === "not_started" ? "Prepare Handover" : "View Handover"
+                  : "Read Revival Brief"}
+              </button>
+
+              {/* Request to Revive button for non-owners */}
+              {!isOwner && repo.published && (
+                <>
+                  {requestingState === "already_requested" || pendingRequest ? (
+                    <div className="flex items-center justify-center gap-2 rounded-none border border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy px-5 py-3 text-[10px] font-mono uppercase font-bold select-none">
+                      REQUEST ALREADY SENT
+                    </div>
+                  ) : requestingState === "success" ? (
+                    <div className="flex items-center justify-center gap-2 rounded-none border border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy px-5 py-3 text-[10px] font-mono uppercase font-bold select-none">
+                      REVIVAL REQUEST SENT
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowRequestForm(!showRequestForm)}
+                      className="flex items-center justify-center gap-2 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+                    >
+                      {showRequestForm ? "Cancel Request" : "REQUEST TO REVIVE"}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="shrink-0 flex items-center gap-3">
-            {isOwner && (
-              <>
-                {handoverState === "prepared" ? (
-                  <div className="flex items-center gap-2 text-semantic-healthy font-mono text-[10px] uppercase font-bold border border-semantic-healthy/20 bg-semantic-healthy/5 px-3 py-1.5 rounded-none">
-                    <span className="h-1.5 w-1.5 rounded-full bg-semantic-healthy" />
-                    Prepared
-                  </div>
-                ) : handoverState === "in_progress" ? (
-                  <div className="flex items-center gap-2 text-brand-accent font-mono text-[10px] uppercase font-bold border border-brand-accent/20 bg-brand-accent/5 px-3 py-1.5 rounded-none animate-pulse">
-                    <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
-                    In Progress
-                  </div>
-                ) : null}
-              </>
-            )}
+          {/* Simple Revival Request Form */}
+          {!isOwner && repo.published && showRequestForm && (
+            <div className="border-t border-border-muted pt-6 mt-4 select-text animate-fade-in">
+              <h4 className="text-xs font-mono uppercase tracking-widest text-text-primary font-bold mb-3">
+                REQUEST TO REVIVE
+              </h4>
+              <p className="text-xs text-text-secondary mb-4">
+                Why are you interested in this project?
+              </p>
 
-            <button
-              onClick={() => setShowHandover(true)}
-              className="flex items-center justify-center gap-2 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
-            >
-              {isOwner
-                ? handoverState === "not_started" ? "Prepare Handover" : "View Handover"
-                : "Read Revival Brief"}
-            </button>
-          </div>
+              {requestError && (
+                <div className="mb-4 p-3 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-mono text-[11px] leading-relaxed">
+                  {requestError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <textarea
+                  value={requestMessage}
+                  onChange={(e) => setRequestMessage(e.target.value.slice(0, 1000))}
+                  placeholder="I've worked with React and FastAPI before and would like to help continue this project..."
+                  rows={4}
+                  className="w-full p-3 text-xs font-sans border border-border-strong bg-surface-secondary text-text-primary placeholder:text-text-muted focus:border-brand-accent focus:outline-none transition-all duration-150 resize-y rounded-none"
+                  disabled={requestingState === "sending"}
+                />
+                <div className="flex justify-between items-center select-none">
+                  <span className="text-[9px] font-mono text-text-muted">
+                    {requestMessage.length}/1000 characters
+                  </span>
+                  <button
+                    onClick={() => handleSendRevivalRequest(requestMessage)}
+                    disabled={requestingState === "sending"}
+                    className="flex items-center justify-center gap-2 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {requestingState === "sending" ? "SENDING..." : "SEND REVIVAL REQUEST"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Success message */}
+          {!isOwner && repo.published && requestingState === "success" && (
+            <div className="border-t border-border-muted pt-4 mt-2 select-text text-xs text-semantic-healthy font-sans leading-relaxed flex items-center gap-2 animate-fade-in">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-healthy">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Your request to revive this project has been submitted successfully to the owner.</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

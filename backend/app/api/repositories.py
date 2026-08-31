@@ -7,9 +7,11 @@ from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.repository import Repository
 from app.models.revival_brief import RevivalBrief
+from app.models.revival_request import RevivalRequest
 from app.schemas.repository import RepositoryResponse
 from app.schemas.dashboard import RepositorySummary
 from app.schemas.revival_brief import RevivalBriefResponse, RevivalBriefUpdate
+from app.schemas.revival_request import RevivalRequestCreate, RevivalRequestResponse
 from app.services.repository_service import (
     get_repository_by_github_id,
     create_repository,
@@ -354,3 +356,88 @@ async def delete_repository_handover(
         db.delete(brief)
         db.commit()
     return {"status": "success"}
+
+
+@router.post("/{repository_id}/revival-requests", response_model=RevivalRequestResponse, status_code=201)
+async def create_revival_request(
+    repository_id: int,
+    payload: RevivalRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    if not repository.published and repository.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    if repository.owner_id == current_user.id:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot request to revive your own repository.",
+        )
+
+    existing_request = (
+        db.query(RevivalRequest)
+        .filter(
+            RevivalRequest.repository_id == repository_id,
+            RevivalRequest.requester_id == current_user.id,
+            RevivalRequest.status == "pending",
+        )
+        .first()
+    )
+    if existing_request:
+        raise HTTPException(
+            status_code=409,
+            detail="You already have an active pending revival request for this repository.",
+        )
+
+    new_request = RevivalRequest(
+        repository_id=repository_id,
+        requester_id=current_user.id,
+        message=payload.message,
+        status="pending",
+    )
+    db.add(new_request)
+    db.commit()
+    db.refresh(new_request)
+
+    return new_request
+
+
+@router.get("/{repository_id}/revival-requests/my-pending", response_model=RevivalRequestResponse | None)
+async def get_my_pending_revival_request(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    if not repository.published and repository.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    request = (
+        db.query(RevivalRequest)
+        .filter(
+            RevivalRequest.repository_id == repository_id,
+            RevivalRequest.requester_id == current_user.id,
+            RevivalRequest.status == "pending",
+        )
+        .first()
+    )
+    return request

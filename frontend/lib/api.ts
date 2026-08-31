@@ -46,6 +46,17 @@ export interface RevivalBriefPayload {
   status?: string;
 }
 
+export interface RevivalRequestResponse {
+  id: number;
+  repository_id: number;
+  requester_id: number;
+  message: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  requester?: UserSummary | null;
+}
+
 
 export interface RepositoryResponse {
   id: number;
@@ -255,5 +266,18 @@ export const api = {
     return request<{ status: string }>(`/repositories/${repositoryId}/handover`, {
       method: "DELETE",
     });
+  },
+
+  // Create Revival Request
+  createRevivalRequest(repositoryId: number, message?: string): Promise<RevivalRequestResponse> {
+    return request<RevivalRequestResponse>(`/repositories/${repositoryId}/revival-requests`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    });
+  },
+
+  // Get My Pending Revival Request
+  getMyPendingRevivalRequest(repositoryId: number): Promise<RevivalRequestResponse | null> {
+    return request<RevivalRequestResponse | null>(`/repositories/${repositoryId}/revival-requests/my-pending`);
   },
 };
