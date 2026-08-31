@@ -4,6 +4,7 @@ from .health import HealthResponse
 from .dormancy import DormancyResponse
 from .analytics import AnalyticsResponse
 from .ai import AIInsightsResponse
+from .revival_request import RevivalRequestCreate, RevivalRequestResponse
 
 __all__ = [
     "RepositoryResponse",
@@ -14,6 +15,8 @@ __all__ = [
     "DormancyResponse",
     "AnalyticsResponse",
     "AIInsightsResponse",
+    "RevivalRequestCreate",
+    "RevivalRequestResponse",
 ]
 
 

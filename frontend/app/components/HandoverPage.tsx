@@ -6,6 +6,7 @@ import {
   HealthResponse,
   DormancyResponse,
   AIInsightsResponse,
+  RevivalRequestResponse,
 } from "@/lib/api";
 
 interface HandoverPageProps {
@@ -23,6 +24,10 @@ interface HandoverPageProps {
   onRevivalIntentChange: (intent: string) => void;
   onPublicationStateChange: (status: "unpublished" | "published") => Promise<void> | void;
   isOwner?: boolean;
+  pendingRequest?: RevivalRequestResponse | null;
+  requestingState?: "idle" | "sending" | "success" | "already_requested" | "error";
+  requestError?: string | null;
+  onSendRevivalRequest?: (message: string) => Promise<void>;
 }
 
 interface GithubContentItem {
@@ -87,6 +92,10 @@ export default function HandoverPage({
   onRevivalIntentChange,
   onPublicationStateChange,
   isOwner = true,
+  pendingRequest = null,
+  requestingState = "idle",
+  requestError = null,
+  onSendRevivalRequest,
 }: HandoverPageProps) {
   const [readmeContent, setReadmeContent] = useState<string | null>(null);
   const [directoryStructure, setDirectoryStructure] = useState<GithubContentItem[] | null>(null);
@@ -94,6 +103,9 @@ export default function HandoverPage({
   const [loadingStructure, setLoadingStructure] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [requestMessage, setRequestMessage] = useState("");
 
   // Fetch README and file listings on mount or repo change
   useEffect(() => {
@@ -1256,6 +1268,138 @@ export default function HandoverPage({
           </div>
         )}
       </div>
+
+      {/* REQUEST TO REVIVE SECTION FOR DEVELOPERS */}
+      {!isOwner && repo.published && (
+        <div className="border border-border-strong bg-surface-base p-8 shadow-sm relative overflow-hidden select-none mt-10">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_100%_0%,rgba(232,121,42,0.04)_0%,transparent_70%)] pointer-events-none" />
+
+          <div className="flex flex-col gap-6 relative z-10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+              <div className="flex-1">
+                <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-2">
+                  REVIVE THIS PROJECT
+                </span>
+                <h3 className="text-lg font-outfit text-text-primary font-bold mb-2">
+                  Express your interest in taking over or co-maintaining this project.
+                </h3>
+                <p className="text-xs text-text-secondary font-sans leading-relaxed max-w-2xl">
+                  By submitting a request, the repository owner will see your interest along with any message you provide.
+                </p>
+              </div>
+
+              <div className="shrink-0 flex items-center gap-3">
+                {pendingRequest ? (
+                  <div className={`flex items-center justify-center gap-2 rounded-none border px-5 py-3 text-[10px] font-mono uppercase font-bold select-none ${
+                    pendingRequest.status === "approved"
+                      ? "border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy"
+                      : pendingRequest.status === "rejected"
+                      ? "border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical"
+                      : "border-brand-accent/20 bg-brand-accent/5 text-brand-accent"
+                  }`}>
+                    {pendingRequest.status === "approved"
+                      ? "REVIVAL REQUEST APPROVED"
+                      : pendingRequest.status === "rejected"
+                      ? "REVIVAL REQUEST REJECTED"
+                      : "REVIVAL REQUEST PENDING"}
+                  </div>
+                ) : requestingState === "success" ? (
+                  <div className="flex items-center justify-center gap-2 rounded-none border border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy px-5 py-3 text-[10px] font-mono uppercase font-bold select-none">
+                    REVIVAL REQUEST SENT
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowRequestForm(!showRequestForm)}
+                    className="flex items-center justify-center gap-2 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-6 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+                  >
+                    {showRequestForm ? "Cancel Request" : "REQUEST TO REVIVE"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {showRequestForm && onSendRevivalRequest && (
+              <div className="border-t border-border-muted pt-6 mt-4 select-text animate-fade-in">
+                <h4 className="text-xs font-mono uppercase tracking-widest text-text-primary font-bold mb-3">
+                  Why are you interested in this project?
+                </h4>
+
+                {requestError && (
+                  <div className="mb-4 p-3 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-mono text-[11px] leading-relaxed">
+                    {requestError}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <textarea
+                    value={requestMessage}
+                    onChange={(e) => setRequestMessage(e.target.value.slice(0, 1000))}
+                    placeholder="I've worked with React and FastAPI before and would like to help continue this project..."
+                    rows={4}
+                    className="w-full p-3 text-xs font-sans border border-border-strong bg-surface-secondary text-text-primary placeholder:text-text-muted focus:border-brand-accent focus:outline-none transition-all duration-150 resize-y rounded-none"
+                    disabled={requestingState === "sending"}
+                  />
+                  <div className="flex justify-between items-center select-none">
+                    <span className="text-[9px] font-mono text-text-muted">
+                      {requestMessage.length}/1000 characters
+                    </span>
+                    <button
+                      onClick={() => onSendRevivalRequest(requestMessage)}
+                      disabled={requestingState === "sending"}
+                      className="flex items-center justify-center gap-2 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {requestingState === "sending" ? "SENDING..." : "SEND REVIVAL REQUEST"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {pendingRequest && (
+              <div className={`border-t border-border-muted pt-4 mt-2 select-text text-xs font-sans leading-relaxed flex items-center gap-2 animate-fade-in ${
+                pendingRequest.status === "approved"
+                  ? "text-semantic-healthy"
+                  : pendingRequest.status === "rejected"
+                  ? "text-semantic-critical"
+                  : "text-brand-accent"
+              }`}>
+                {pendingRequest.status === "approved" ? (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-healthy">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Your request to revive this project has been approved by the owner.</span>
+                  </>
+                ) : pendingRequest.status === "rejected" ? (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-critical">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Your request to revive this project was declined by the owner.</span>
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-brand-accent">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Your request is currently awaiting review by the owner.</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {!pendingRequest && requestingState === "success" && (
+              <div className="border-t border-border-muted pt-4 mt-2 select-text text-xs text-semantic-healthy font-sans leading-relaxed flex items-center gap-2 animate-fade-in">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-healthy">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Your request to revive this project has been submitted successfully to the owner.</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
 
       {/* Prepare/Edit controls at the bottom for Prepared state */}
       {isOwner && handoverState === "prepared" && (

@@ -7,6 +7,7 @@ import {
   HealthResponse,
   DormancyResponse,
   AIInsightsResponse,
+  RevivalRequestResponse,
 } from "@/lib/api";
 import HandoverPage from "./HandoverPage";
 
@@ -41,6 +42,26 @@ export default function RepoDetails({
   const [revivalIntent, setRevivalIntent] = useState("");
   const [publicationState, setPublicationState] = useState<"unpublished" | "published">("unpublished");
 
+  // Revival request states
+  const [pendingRequest, setPendingRequest] = useState<RevivalRequestResponse | null>(null);
+  const [requestMessage, setRequestMessage] = useState("");
+  const [requestingState, setRequestingState] = useState<"idle" | "sending" | "success" | "already_requested" | "error">("idle");
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [showRequestForm, setShowRequestForm] = useState(false);
+
+  // Owner requests list states
+  const [incomingRequests, setIncomingRequests] = useState<RevivalRequestResponse[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
+
+  // State to track decision confirmation: { requestId: number, action: "approve" | "reject" | null }
+  const [decisionConfirm, setDecisionConfirm] = useState<{ requestId: number; action: "approve" | "reject" | null }>({
+    requestId: 0,
+    action: null,
+  });
+  // State to track currently updating requests: { [requestId: number]: "approving" | "rejecting" }
+  const [updatingRequests, setUpdatingRequests] = useState<{ [key: number]: "approving" | "rejecting" }>({});
+
   const fetchData = async () => {
     setLoading(true);
     setError(null);
@@ -48,11 +69,12 @@ export default function RepoDetails({
     setAiLoading(false);
     setAiError(null);
     try {
-      const [r, h, d, brief] = await Promise.all([
+      const [r, h, d, brief, req] = await Promise.all([
         api.getRepository(repoId),
         api.getRepositoryHealth(repoId),
         api.getRepositoryDormancy(repoId),
         api.getHandover(repoId).catch(() => null),
+        api.getMyRevivalRequest(repoId).catch(() => null),
       ]);
       setRepo(r);
       setHealth(h);
@@ -66,6 +88,25 @@ export default function RepoDetails({
         setHandoverState("not_started");
         setDeveloperNotes("");
         setRevivalIntent("");
+      }
+      setPendingRequest(req);
+      if (req) {
+        setRequestingState("already_requested");
+      } else {
+        setRequestingState("idle");
+      }
+
+      if (isOwner) {
+        setLoadingRequests(true);
+        setRequestsError(null);
+        try {
+          const reqs = await api.getRevivalRequests(repoId);
+          setIncomingRequests(reqs);
+        } catch (err: any) {
+          setRequestsError(err.message || "Failed to load revival requests.");
+        } finally {
+          setLoadingRequests(false);
+        }
       }
     } catch (err: any) {
       setError(err.message || "Failed to fetch repository details.");
@@ -223,6 +264,58 @@ export default function RepoDetails({
     );
   }
 
+  const handleSendRevivalRequest = async (message: string) => {
+    setRequestingState("sending");
+    setRequestError(null);
+    try {
+      const res = await api.createRevivalRequest(repoId, message);
+      setPendingRequest(res);
+      setRequestingState("success");
+      setShowRequestForm(false);
+    } catch (err: any) {
+      setRequestError(err.message || "Failed to submit revival request.");
+      setRequestingState("error");
+    }
+  };
+
+  const handleApproveRequest = async (requestId: number) => {
+    setUpdatingRequests((prev) => ({ ...prev, [requestId]: "approving" }));
+    setDecisionConfirm({ requestId: 0, action: null });
+    try {
+      const updated = await api.approveRevivalRequest(repoId, requestId);
+      setIncomingRequests((prev) =>
+        prev.map((req) => (req.id === requestId ? updated : req))
+      );
+    } catch (err: any) {
+      alert(err.message || "Failed to approve request.");
+    } finally {
+      setUpdatingRequests((prev) => {
+        const copy = { ...prev };
+        delete copy[requestId];
+        return copy;
+      });
+    }
+  };
+
+  const handleRejectRequest = async (requestId: number) => {
+    setUpdatingRequests((prev) => ({ ...prev, [requestId]: "rejecting" }));
+    setDecisionConfirm({ requestId: 0, action: null });
+    try {
+      const updated = await api.rejectRevivalRequest(repoId, requestId);
+      setIncomingRequests((prev) =>
+        prev.map((req) => (req.id === requestId ? updated : req))
+      );
+    } catch (err: any) {
+      alert(err.message || "Failed to reject request.");
+    } finally {
+      setUpdatingRequests((prev) => {
+        const copy = { ...prev };
+        delete copy[requestId];
+        return copy;
+      });
+    }
+  };
+
   if (showHandover && repo) {
     return (
       <HandoverPage
@@ -240,6 +333,10 @@ export default function RepoDetails({
         onRevivalIntentChange={handleRevivalIntentChange}
         onPublicationStateChange={handlePublicationStateChange}
         isOwner={isOwner}
+        pendingRequest={pendingRequest}
+        requestingState={requestingState}
+        requestError={requestError}
+        onSendRevivalRequest={handleSendRevivalRequest}
       />
     );
   }
@@ -498,49 +595,336 @@ export default function RepoDetails({
         {/* Subtle background decoration to emphasize the feature */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_100%_0%,rgba(232,121,42,0.04)_0%,transparent_70%)] pointer-events-none" />
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative z-10">
-          <div className="flex-1">
-            <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-2">
-              {isOwner ? "HANDOVER" : "REVIVAL BRIEF"}
-            </span>
-            <h3 className="text-lg font-outfit text-text-primary font-bold mb-2">
-              {isOwner ? "Prepare this repository for the next developer." : "Handover context from the owner."}
-            </h3>
-            <p className="text-xs text-text-secondary font-sans leading-relaxed max-w-2xl">
-              {isOwner
-                ? "Create a structured handover that explains the project, important areas, current state, and things the next developer should know."
-                : "Read the custom developer notes and revival intent to understand what you are inheriting."}
-            </p>
+        <div className="flex flex-col gap-6 relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+            <div className="flex-1">
+              <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-2">
+                {isOwner ? "HANDOVER" : "REVIVAL BRIEF"}
+              </span>
+              <h3 className="text-lg font-outfit text-text-primary font-bold mb-2">
+                {isOwner ? "Prepare this repository for the next developer." : "Handover context from the owner."}
+              </h3>
+              <p className="text-xs text-text-secondary font-sans leading-relaxed max-w-2xl">
+                {isOwner
+                  ? "Create a structured handover that explains the project, important areas, current state, and things the next developer should know."
+                  : "Read the custom developer notes and revival intent to understand what you are inheriting."}
+              </p>
+            </div>
+
+            <div className="shrink-0 flex flex-wrap items-center gap-3">
+              {isOwner && (
+                <>
+                  {handoverState === "prepared" ? (
+                    <div className="flex items-center gap-2 text-semantic-healthy font-mono text-[10px] uppercase font-bold border border-semantic-healthy/20 bg-semantic-healthy/5 px-3 py-1.5 rounded-none">
+                      <span className="h-1.5 w-1.5 rounded-full bg-semantic-healthy" />
+                      Prepared
+                    </div>
+                  ) : handoverState === "in_progress" ? (
+                    <div className="flex items-center gap-2 text-brand-accent font-mono text-[10px] uppercase font-bold border border-brand-accent/20 bg-brand-accent/5 px-3 py-1.5 rounded-none animate-pulse">
+                      <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
+                      In Progress
+                    </div>
+                  ) : null}
+                </>
+              )}
+
+              <button
+                onClick={() => setShowHandover(true)}
+                className={`flex items-center justify-center gap-2 rounded-none px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-brand-accent ${
+                  isOwner
+                    ? "bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent hover:shadow-md"
+                    : "bg-surface-secondary border border-border-strong text-text-primary hover:bg-surface-base"
+                }`}
+              >
+                {isOwner
+                  ? handoverState === "not_started" ? "Prepare Handover" : "View Handover"
+                  : "Read Revival Brief"}
+              </button>
+
+              {/* Request to Revive button for non-owners */}
+              {!isOwner && repo.published && (
+                <>
+                  {pendingRequest ? (
+                    <div className={`flex items-center justify-center gap-2 rounded-none border px-5 py-3 text-[10px] font-mono uppercase font-bold select-none ${
+                      pendingRequest.status === "approved"
+                        ? "border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy"
+                        : pendingRequest.status === "rejected"
+                        ? "border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical"
+                        : "border-brand-accent/20 bg-brand-accent/5 text-brand-accent"
+                    }`}>
+                      {pendingRequest.status === "approved"
+                        ? "REVIVAL REQUEST APPROVED"
+                        : pendingRequest.status === "rejected"
+                        ? "REVIVAL REQUEST REJECTED"
+                        : "REVIVAL REQUEST PENDING"}
+                    </div>
+                  ) : requestingState === "success" ? (
+                    <div className="flex items-center justify-center gap-2 rounded-none border border-semantic-healthy/20 bg-semantic-healthy/5 text-semantic-healthy px-5 py-3 text-[10px] font-mono uppercase font-bold select-none">
+                      REVIVAL REQUEST SENT
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowRequestForm(!showRequestForm)}
+                      className="flex items-center justify-center gap-2 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
+                    >
+                      {showRequestForm ? "Cancel Request" : "REQUEST TO REVIVE"}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="shrink-0 flex items-center gap-3">
-            {isOwner && (
-              <>
-                {handoverState === "prepared" ? (
-                  <div className="flex items-center gap-2 text-semantic-healthy font-mono text-[10px] uppercase font-bold border border-semantic-healthy/20 bg-semantic-healthy/5 px-3 py-1.5 rounded-none">
-                    <span className="h-1.5 w-1.5 rounded-full bg-semantic-healthy" />
-                    Prepared
-                  </div>
-                ) : handoverState === "in_progress" ? (
-                  <div className="flex items-center gap-2 text-brand-accent font-mono text-[10px] uppercase font-bold border border-brand-accent/20 bg-brand-accent/5 px-3 py-1.5 rounded-none animate-pulse">
-                    <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
-                    In Progress
-                  </div>
-                ) : null}
-              </>
-            )}
+          {/* Simple Revival Request Form */}
+          {!isOwner && repo.published && showRequestForm && (
+            <div className="border-t border-border-muted pt-6 mt-4 select-text animate-fade-in">
+              <h4 className="text-xs font-mono uppercase tracking-widest text-text-primary font-bold mb-3">
+                REQUEST TO REVIVE
+              </h4>
+              <p className="text-xs text-text-secondary mb-4">
+                Why are you interested in this project?
+              </p>
 
-            <button
-              onClick={() => setShowHandover(true)}
-              className="flex items-center justify-center gap-2 rounded-none bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent"
-            >
-              {isOwner
-                ? handoverState === "not_started" ? "Prepare Handover" : "View Handover"
-                : "Read Revival Brief"}
-            </button>
-          </div>
+              {requestError && (
+                <div className="mb-4 p-3 border border-semantic-critical/20 bg-semantic-critical/5 text-semantic-critical font-mono text-[11px] leading-relaxed">
+                  {requestError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <textarea
+                  value={requestMessage}
+                  onChange={(e) => setRequestMessage(e.target.value.slice(0, 1000))}
+                  placeholder="I've worked with React and FastAPI before and would like to help continue this project..."
+                  rows={4}
+                  className="w-full p-3 text-xs font-sans border border-border-strong bg-surface-secondary text-text-primary placeholder:text-text-muted focus:border-brand-accent focus:outline-none transition-all duration-150 resize-y rounded-none"
+                  disabled={requestingState === "sending"}
+                />
+                <div className="flex justify-between items-center select-none">
+                  <span className="text-[9px] font-mono text-text-muted">
+                    {requestMessage.length}/1000 characters
+                  </span>
+                  <button
+                    onClick={() => handleSendRevivalRequest(requestMessage)}
+                    disabled={requestingState === "sending"}
+                    className="flex items-center justify-center gap-2 rounded-none bg-brand-accent border border-brand-accent text-white hover:bg-text-primary hover:border-text-primary px-5 py-3 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 cursor-pointer shadow-sm hover:shadow-md outline-none focus-visible:ring-1 focus-visible:ring-brand-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {requestingState === "sending" ? "SENDING..." : "SEND REVIVAL REQUEST"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Developer request status details */}
+          {!isOwner && repo.published && pendingRequest && (
+            <div className={`border-t border-border-muted pt-4 mt-2 select-text text-xs font-sans leading-relaxed flex items-center gap-2 animate-fade-in ${
+              pendingRequest.status === "approved"
+                ? "text-semantic-healthy"
+                : pendingRequest.status === "rejected"
+                ? "text-semantic-critical"
+                : "text-brand-accent"
+            }`}>
+              {pendingRequest.status === "approved" ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-healthy">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Your request to revive this project has been approved by the owner.</span>
+                </>
+              ) : pendingRequest.status === "rejected" ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-critical">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Your request to revive this project was declined by the owner.</span>
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-brand-accent">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Your request is currently awaiting review by the owner.</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {!isOwner && repo.published && !pendingRequest && requestingState === "success" && (
+            <div className="border-t border-border-muted pt-4 mt-2 select-text text-xs text-semantic-healthy font-sans leading-relaxed flex items-center gap-2 animate-fade-in">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4.5 w-4.5 text-semantic-healthy">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Your request to revive this project has been submitted successfully to the owner.</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Owner-only Revival Requests Section */}
+      {isOwner && (
+        <div className="border border-border-muted bg-surface-base p-8 mb-10 shadow-sm mt-10">
+          <div className="border-b border-border-muted pb-4 mb-6 select-none flex justify-between items-baseline">
+            <div>
+              <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-1">
+                REVIVAL REQUESTS
+              </span>
+              <p className="text-xs text-text-secondary font-sans leading-relaxed">
+                Developers interested in continuing this project
+              </p>
+            </div>
+            {incomingRequests.length > 0 && (
+              <span className="rounded-none border border-brand-accent/30 bg-brand-accent/10 text-brand-accent px-2 py-0.5 text-[9px] font-mono uppercase font-bold">
+                {incomingRequests.length} {incomingRequests.length === 1 ? "REQUEST" : "REQUESTS"}
+              </span>
+            )}
+          </div>
+
+          {loadingRequests ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-3 select-none">
+              <div className="flex items-center gap-1.5">
+                <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse" />
+                <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse [animation-delay:0.2s]" />
+                <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse [animation-delay:0.4s]" />
+              </div>
+              <span className="text-[10px] font-mono uppercase text-text-muted">Loading requests</span>
+            </div>
+          ) : requestsError ? (
+            <div className="border border-semantic-critical/20 bg-semantic-critical/5 p-6 text-center">
+              <span className="text-[10px] font-mono uppercase text-semantic-critical font-bold">Failed to load requests</span>
+              <p className="text-xs text-text-secondary mt-1.5">{requestsError}</p>
+            </div>
+          ) : incomingRequests.length === 0 ? (
+            <div className="border border-dashed border-border-strong py-10 px-6 text-center select-none bg-surface-secondary/20">
+              <h4 className="text-xs font-mono uppercase tracking-widest text-text-muted font-bold">
+                NO REVIVAL REQUESTS YET
+              </h4>
+              <p className="text-[11px] text-text-secondary font-sans mt-2 max-w-md mx-auto">
+                When developers discover and request to revive the project, their requests will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {incomingRequests.map((request) => {
+                const requester = request.requester;
+                const requesterName = requester ? (requester.name || requester.username) : "Developer";
+                const requesterAvatar = requester?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${requesterName}`;
+                const createdDate = new Date(request.created_at).toLocaleDateString(undefined, {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                });
+
+                return (
+                  <div key={request.id} className="border border-border-muted p-5 bg-surface-secondary/15 flex flex-col md:flex-row gap-5 items-start md:items-center justify-between animate-fade-in">
+                    <div className="flex-1">
+                      {/* Requester Info Header */}
+                      <div className="flex items-center gap-3 mb-3 select-none">
+                        <img
+                          src={requesterAvatar}
+                          alt={requesterName}
+                          className="h-8 w-8 rounded-full border border-border-muted object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${requesterName}`;
+                          }}
+                        />
+                        <div>
+                          <strong className="text-xs font-outfit text-text-primary block font-bold">
+                            {requesterName}
+                          </strong>
+                          {requester?.username && (
+                            <span className="text-[10px] font-mono text-text-muted block">
+                              @{requester.username.toLowerCase()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Request Message */}
+                      <blockquote className="text-xs text-text-secondary bg-surface-base border-l-2 border-brand-accent/50 pl-3 py-1 font-sans leading-relaxed select-text whitespace-pre-wrap">
+                        {request.message || <span className="text-text-muted italic">No message attached to request.</span>}
+                      </blockquote>
+                    </div>
+
+                    {/* Metadata, Status & Actions */}
+                    <div className="flex flex-col items-start md:items-end gap-3 shrink-0 select-none">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider border ${
+                          request.status === "approved"
+                            ? "text-semantic-healthy border-semantic-healthy/20 bg-semantic-healthy/5"
+                            : request.status === "rejected"
+                            ? "text-semantic-critical border-semantic-critical/20 bg-semantic-critical/5"
+                            : "text-brand-accent border-brand-accent/20 bg-brand-accent/5"
+                        }`}>
+                          {request.status}
+                        </span>
+                      </div>
+
+                      <span className="text-[10px] font-mono text-text-muted">
+                        Requested: {createdDate}
+                      </span>
+
+                      {/* Approve / Reject actions for pending requests */}
+                      {request.status === "pending" && (
+                        <div className="mt-2 flex flex-col md:flex-row gap-2 items-stretch md:items-center">
+                          {decisionConfirm.requestId === request.id && decisionConfirm.action !== null ? (
+                            <div className="flex flex-col gap-2 items-end border border-border-muted p-2.5 bg-surface-secondary/20">
+                              <span className="text-[10px] font-sans text-text-primary">
+                                {decisionConfirm.action === "approve" ? "Approve this revival request?" : "Reject this revival request?"}
+                              </span>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setDecisionConfirm({ requestId: 0, action: null })}
+                                  className="px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider border border-border-strong text-text-secondary bg-surface-base hover:text-text-primary cursor-pointer transition-all"
+                                  disabled={updatingRequests[request.id] !== undefined}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => decisionConfirm.action === "approve" ? handleApproveRequest(request.id) : handleRejectRequest(request.id)}
+                                  className={`px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider text-white cursor-pointer transition-all ${
+                                    decisionConfirm.action === "approve"
+                                      ? "bg-semantic-healthy border border-semantic-healthy hover:bg-emerald-600"
+                                      : "bg-semantic-critical border border-semantic-critical hover:bg-red-600"
+                                  }`}
+                                  disabled={updatingRequests[request.id] !== undefined}
+                                >
+                                  {updatingRequests[request.id] === "approving"
+                                    ? "APPROVING..."
+                                    : updatingRequests[request.id] === "rejecting"
+                                    ? "REJECTING..."
+                                    : decisionConfirm.action === "approve"
+                                    ? "APPROVE"
+                                    : "REJECT"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setDecisionConfirm({ requestId: request.id, action: "approve" })}
+                                className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider bg-semantic-healthy border border-semantic-healthy text-white hover:bg-emerald-600 cursor-pointer shadow-sm transition-all"
+                              >
+                                APPROVE
+                              </button>
+                              <button
+                                onClick={() => setDecisionConfirm({ requestId: request.id, action: "reject" })}
+                                className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-semantic-critical/20 bg-surface-base text-semantic-critical hover:bg-semantic-critical/5 cursor-pointer shadow-sm transition-all"
+                              >
+                                REJECT
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

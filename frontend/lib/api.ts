@@ -46,6 +46,23 @@ export interface RevivalBriefPayload {
   status?: string;
 }
 
+export interface RequesterSummary {
+  username: string;
+  name: string | null;
+  avatar_url: string | null;
+}
+
+export interface RevivalRequestResponse {
+  id: number;
+  repository_id: number;
+  requester_id: number;
+  message: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  requester?: RequesterSummary | null;
+}
+
 
 export interface RepositoryResponse {
   id: number;
@@ -254,6 +271,43 @@ export const api = {
   deleteHandover(repositoryId: number): Promise<{ status: string }> {
     return request<{ status: string }>(`/repositories/${repositoryId}/handover`, {
       method: "DELETE",
+    });
+  },
+
+  // Create Revival Request
+  createRevivalRequest(repositoryId: number, message?: string): Promise<RevivalRequestResponse> {
+    return request<RevivalRequestResponse>(`/repositories/${repositoryId}/revival-requests`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    });
+  },
+
+  // Get My Pending Revival Request
+  getMyPendingRevivalRequest(repositoryId: number): Promise<RevivalRequestResponse | null> {
+    return request<RevivalRequestResponse | null>(`/repositories/${repositoryId}/revival-requests/my-pending`);
+  },
+
+  // Get My Latest Revival Request regardless of status
+  getMyRevivalRequest(repositoryId: number): Promise<RevivalRequestResponse | null> {
+    return request<RevivalRequestResponse | null>(`/repositories/${repositoryId}/revival-requests/my`);
+  },
+
+  // Get all Revival Requests (Owner-only)
+  getRevivalRequests(repositoryId: number): Promise<RevivalRequestResponse[]> {
+    return request<RevivalRequestResponse[]>(`/repositories/${repositoryId}/revival-requests`);
+  },
+
+  // Approve a Revival Request (Owner-only)
+  approveRevivalRequest(repositoryId: number, requestId: number): Promise<RevivalRequestResponse> {
+    return request<RevivalRequestResponse>(`/repositories/${repositoryId}/revival-requests/${requestId}/approve`, {
+      method: "POST",
+    });
+  },
+
+  // Reject a Revival Request (Owner-only)
+  rejectRevivalRequest(repositoryId: number, requestId: number): Promise<RevivalRequestResponse> {
+    return request<RevivalRequestResponse>(`/repositories/${repositoryId}/revival-requests/${requestId}/reject`, {
+      method: "POST",
     });
   },
 };
