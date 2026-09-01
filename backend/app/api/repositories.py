@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 import httpx
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
@@ -8,10 +9,13 @@ from app.models.user import User
 from app.models.repository import Repository
 from app.models.revival_brief import RevivalBrief
 from app.models.revival_request import RevivalRequest
+from app.models.revival_team import RevivalTeam
+from app.models.revival_team_member import RevivalTeamMember
 from app.schemas.repository import RepositoryResponse
 from app.schemas.dashboard import RepositorySummary
 from app.schemas.revival_brief import RevivalBriefResponse, RevivalBriefUpdate
 from app.schemas.revival_request import RevivalRequestCreate, RevivalRequestResponse
+from app.schemas.revival_team import RevivalTeamResponse, TeamUserSummary, RevivalTeamMemberResponse
 from app.services.repository_service import (
     get_repository_by_github_id,
     create_repository,
@@ -527,8 +531,43 @@ async def approve_revival_request(
             detail="Revival request has already been decided.",
         )
 
-    request.status = "approved"
-    db.commit()
+    try:
+        team = db.query(RevivalTeam).filter(RevivalTeam.repository_id == repository_id).first()
+        if not team:
+            team = RevivalTeam(
+                repository_id=repository.id,
+                owner_id=repository.owner_id,
+            )
+            db.add(team)
+            db.flush()
+
+        existing_member = (
+            db.query(RevivalTeamMember)
+            .filter(
+                RevivalTeamMember.team_id == team.id,
+                RevivalTeamMember.user_id == request.requester_id,
+            )
+            .first()
+        )
+        if not existing_member:
+            new_member = RevivalTeamMember(
+                team_id=team.id,
+                user_id=request.requester_id,
+            )
+            db.add(new_member)
+
+        request.status = "approved"
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Could not approve request due to a conflict.",
+        )
+    except Exception:
+        db.rollback()
+        raise
+
     db.refresh(request)
     return request
 
@@ -561,3 +600,53 @@ async def reject_revival_request(
     db.commit()
     db.refresh(request)
     return request
+
+
+@router.get("/{repository_id}/revival-team", response_model=RevivalTeamResponse)
+async def get_revival_team(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    team = db.query(RevivalTeam).filter(RevivalTeam.repository_id == repository_id).first()
+
+    is_owner = repository.owner_id == current_user.id
+    is_published = repository.published
+    is_member = False
+    if team:
+        is_member = (
+            db.query(RevivalTeamMember)
+            .filter(
+                RevivalTeamMember.team_id == team.id,
+                RevivalTeamMember.user_id == current_user.id,
+            )
+            .first()
+            is not None
+        )
+
+    if not is_owner and not is_published and not is_member:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    if not team:
+        raise HTTPException(status_code=404, detail="Revival team not found")
+
+    members = (
+        db.query(RevivalTeamMember)
+        .filter(RevivalTeamMember.team_id == team.id)
+        .order_by(RevivalTeamMember.joined_at.asc(), RevivalTeamMember.id.asc())
+        .all()
+    )
+
+    return RevivalTeamResponse(
+        id=team.id,
+        repository_id=team.repository_id,
+        owner_id=team.owner_id,
+        created_at=team.created_at,
+        updated_at=team.updated_at,
+        owner=TeamUserSummary.model_validate(team.owner) if team.owner else None,
+        members=[RevivalTeamMemberResponse.model_validate(m) for m in members],
+    )

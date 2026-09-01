@@ -8,8 +8,10 @@ import {
   DormancyResponse,
   AIInsightsResponse,
   RevivalRequestResponse,
+  RevivalTeamResponse,
 } from "@/lib/api";
 import HandoverPage from "./HandoverPage";
+import RevivalTeam from "./RevivalTeam";
 
 interface RepoDetailsProps {
   repoId: number;
@@ -59,6 +61,24 @@ export default function RepoDetails({
     requestId: 0,
     action: null,
   });
+  // Revival team states
+  const [team, setTeam] = useState<RevivalTeamResponse | null>(null);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
+
+  const fetchTeam = async () => {
+    setLoadingTeam(true);
+    setTeamError(null);
+    try {
+      const t = await api.getRevivalTeam(repoId);
+      setTeam(t);
+    } catch (err: any) {
+      setTeamError(err.message || "Failed to load revival team.");
+    } finally {
+      setLoadingTeam(false);
+    }
+  };
+
   // State to track currently updating requests: { [requestId: number]: "approving" | "rejecting" }
   const [updatingRequests, setUpdatingRequests] = useState<{ [key: number]: "approving" | "rejecting" }>({});
 
@@ -117,6 +137,7 @@ export default function RepoDetails({
 
   useEffect(() => {
     fetchData();
+    fetchTeam();
   }, [repoId]);
 
   const handleNotesChange = async (notes: string) => {
@@ -286,6 +307,7 @@ export default function RepoDetails({
       setIncomingRequests((prev) =>
         prev.map((req) => (req.id === requestId ? updated : req))
       );
+      fetchTeam();
     } catch (err: any) {
       alert(err.message || "Failed to approve request.");
     } finally {
@@ -760,6 +782,15 @@ export default function RepoDetails({
           )}
         </div>
       </div>
+
+      {/* Revival Team Section */}
+      <RevivalTeam
+        team={team}
+        loading={loadingTeam}
+        error={teamError}
+        isOwner={isOwner}
+        onRetry={fetchTeam}
+      />
 
       {/* Owner-only Revival Requests Section */}
       {isOwner && (

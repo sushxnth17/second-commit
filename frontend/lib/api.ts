@@ -63,6 +63,34 @@ export interface RevivalRequestResponse {
   requester?: RequesterSummary | null;
 }
 
+export interface TeamUserSummary {
+  id: number;
+  username: string;
+  name: string | null;
+  avatar_url: string | null;
+}
+
+export interface RevivalTeamMemberResponse {
+  id: number;
+  team_id: number;
+  user_id: number;
+  joined_at: string;
+  user?: TeamUserSummary | null;
+  username?: string | null;
+  name?: string | null;
+  avatar_url?: string | null;
+}
+
+export interface RevivalTeamResponse {
+  id: number;
+  repository_id: number;
+  owner_id: number;
+  created_at: string;
+  updated_at: string;
+  owner?: TeamUserSummary | null;
+  members: RevivalTeamMemberResponse[];
+}
+
 
 export interface RepositoryResponse {
   id: number;
@@ -309,5 +337,17 @@ export const api = {
     return request<RevivalRequestResponse>(`/repositories/${repositoryId}/revival-requests/${requestId}/reject`, {
       method: "POST",
     });
+  },
+
+  // Get Revival Team
+  async getRevivalTeam(repositoryId: number): Promise<RevivalTeamResponse | null> {
+    try {
+      return await request<RevivalTeamResponse>(`/repositories/${repositoryId}/revival-team`);
+    } catch (err: any) {
+      if (err.message === "Revival team not found") {
+        return null;
+      }
+      throw err;
+    }
   },
 };
