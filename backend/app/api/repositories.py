@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 import httpx
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
@@ -8,6 +9,8 @@ from app.models.user import User
 from app.models.repository import Repository
 from app.models.revival_brief import RevivalBrief
 from app.models.revival_request import RevivalRequest
+from app.models.revival_team import RevivalTeam
+from app.models.revival_team_member import RevivalTeamMember
 from app.schemas.repository import RepositoryResponse
 from app.schemas.dashboard import RepositorySummary
 from app.schemas.revival_brief import RevivalBriefResponse, RevivalBriefUpdate
@@ -527,8 +530,43 @@ async def approve_revival_request(
             detail="Revival request has already been decided.",
         )
 
-    request.status = "approved"
-    db.commit()
+    try:
+        team = db.query(RevivalTeam).filter(RevivalTeam.repository_id == repository_id).first()
+        if not team:
+            team = RevivalTeam(
+                repository_id=repository.id,
+                owner_id=repository.owner_id,
+            )
+            db.add(team)
+            db.flush()
+
+        existing_member = (
+            db.query(RevivalTeamMember)
+            .filter(
+                RevivalTeamMember.team_id == team.id,
+                RevivalTeamMember.user_id == request.requester_id,
+            )
+            .first()
+        )
+        if not existing_member:
+            new_member = RevivalTeamMember(
+                team_id=team.id,
+                user_id=request.requester_id,
+            )
+            db.add(new_member)
+
+        request.status = "approved"
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Could not approve request due to a conflict.",
+        )
+    except Exception:
+        db.rollback()
+        raise
+
     db.refresh(request)
     return request
 
