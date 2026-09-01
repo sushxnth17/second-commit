@@ -29,3 +29,13 @@ class User(Base):
         "Repository",
         back_populates="owner",
     )
+    owned_revival_teams = relationship(
+        "RevivalTeam",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    revival_team_memberships = relationship(
+        "RevivalTeamMember",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

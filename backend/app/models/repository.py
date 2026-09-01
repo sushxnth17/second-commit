@@ -55,3 +55,10 @@ class Repository(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+
+    revival_team = relationship(
+        "RevivalTeam",
+        back_populates="repository",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
