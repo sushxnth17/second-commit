@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 
 class TeamUserSummary(BaseModel):
@@ -19,6 +19,21 @@ class RevivalTeamMemberResponse(BaseModel):
     user: TeamUserSummary | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def username(self) -> str | None:
+        return self.user.username if self.user else None
+
+    @computed_field
+    @property
+    def name(self) -> str | None:
+        return self.user.name if self.user else None
+
+    @computed_field
+    @property
+    def avatar_url(self) -> str | None:
+        return self.user.avatar_url if self.user else None
 
 
 class RevivalTeamResponse(BaseModel):

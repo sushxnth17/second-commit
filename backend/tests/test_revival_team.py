@@ -763,3 +763,346 @@ def test_approval_on_unpublished_repository(client, db_session, test_user, auth_
     assert team.owner_id == test_user.id
     assert len(team.members) == 1
     assert team.members[0].user_id == dev_b.id
+
+
+def test_get_revival_team_owner_access(client, db_session, test_user, auth_context):
+    """Verify owner can retrieve Revival Team and team contents are correct."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 2001,
+            "name": "get-team-repo-1",
+            "full_name": "testuser/get-team-repo-1",
+            "html_url": "https://github.com/testuser/get-team-repo-1",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    dev_b = create_user(
+        db=db_session,
+        github_id=30001,
+        username="dev_member_api",
+        name="Dev Member API",
+        avatar_url="https://avatar.url/api",
+        access_token="tok_api_secret",
+    )
+    db_session.commit()
+
+    auth_context.user = dev_b
+    req_id = client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "Revive"}).json()["id"]
+
+    auth_context.user = test_user
+    client.post(f"/repositories/{repo.id}/revival-requests/{req_id}/approve")
+
+    # Retrieve team as owner
+    res = client.get(f"/repositories/{repo.id}/revival-team")
+    assert res.status_code == 200
+    data = res.json()
+
+    # Verify team metadata
+    assert data["repository_id"] == repo.id
+    assert data["owner_id"] == test_user.id
+    assert data["owner"]["username"] == test_user.username
+    assert "access_token" not in data["owner"]
+    assert "access_token" not in data
+
+    # Verify members
+    assert len(data["members"]) == 1
+    m = data["members"][0]
+    assert m["user_id"] == dev_b.id
+    assert m["username"] == "dev_member_api"
+    assert m["name"] == "Dev Member API"
+    assert m["avatar_url"] == "https://avatar.url/api"
+    assert "access_token" not in m
+    if m.get("user"):
+        assert "access_token" not in m["user"]
+
+    # Owner is not duplicated as a member
+    member_user_ids = [mem["user_id"] for mem in data["members"]]
+    assert test_user.id not in member_user_ids
+
+
+def test_get_revival_team_published_visitor_access(client, db_session, test_user, auth_context):
+    """Verify any authenticated visitor can retrieve team for a published repository."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 2002,
+            "name": "get-team-repo-2",
+            "full_name": "testuser/get-team-repo-2",
+            "html_url": "https://github.com/testuser/get-team-repo-2",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    visitor = create_user(
+        db=db_session,
+        github_id=30002,
+        username="visitor_user",
+        name="Visitor",
+        avatar_url=None,
+        access_token="tok_vis",
+    )
+    dev_b = create_user(
+        db=db_session,
+        github_id=30003,
+        username="dev_team_b",
+        name="Dev Team B",
+        avatar_url=None,
+        access_token="tok_b",
+    )
+    db_session.commit()
+
+    auth_context.user = dev_b
+    req_id = client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "Join"}).json()["id"]
+
+    auth_context.user = test_user
+    client.post(f"/repositories/{repo.id}/revival-requests/{req_id}/approve")
+
+    # Visitor retrieves team
+    auth_context.user = visitor
+    res = client.get(f"/repositories/{repo.id}/revival-team")
+    assert res.status_code == 200
+    assert res.json()["repository_id"] == repo.id
+    assert len(res.json()["members"]) == 1
+
+
+def test_get_revival_team_unauthenticated(client, db_session, test_user, auth_context):
+    """Verify unauthenticated user receives 401."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 2003,
+            "name": "get-team-repo-3",
+            "full_name": "testuser/get-team-repo-3",
+            "html_url": "https://github.com/testuser/get-team-repo-3",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    auth_context.user = None
+    res = client.get(f"/repositories/{repo.id}/revival-team")
+    assert res.status_code == 401
+
+
+def test_get_revival_team_unpublished_non_owner_forbidden(client, db_session, test_user, auth_context):
+    """Verify non-owner non-member receives 404 when repository is unpublished."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 2004,
+            "name": "get-team-repo-4",
+            "full_name": "testuser/get-team-repo-4",
+            "html_url": "https://github.com/testuser/get-team-repo-4",
+            "default_branch": "main",
+        },
+    )
+    repo.published = False
+    db_session.commit()
+
+    team = RevivalTeam(repository_id=repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    other_user = create_user(
+        db=db_session,
+        github_id=30004,
+        username="random_user",
+        name="Random",
+        avatar_url=None,
+        access_token="tok_rnd",
+    )
+    db_session.commit()
+
+    auth_context.user = other_user
+    res = client.get(f"/repositories/{repo.id}/revival-team")
+    assert res.status_code == 404
+    assert res.json()["detail"] == "Repository not found"
+
+
+def test_get_revival_team_unpublished_owner_access(client, db_session, test_user, auth_context):
+    """Verify owner can view team even if repository is unpublished."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 2005,
+            "name": "get-team-repo-5",
+            "full_name": "testuser/get-team-repo-5",
+            "html_url": "https://github.com/testuser/get-team-repo-5",
+            "default_branch": "main",
+        },
+    )
+    repo.published = False
+    db_session.commit()
+
+    team = RevivalTeam(repository_id=repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    auth_context.user = test_user
+    res = client.get(f"/repositories/{repo.id}/revival-team")
+    assert res.status_code == 200
+    assert res.json()["repository_id"] == repo.id
+
+
+def test_get_revival_team_unpublished_member_access(client, db_session, test_user, auth_context):
+    """Verify an approved team member can view team even if repository is unpublished."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 2006,
+            "name": "get-team-repo-6",
+            "full_name": "testuser/get-team-repo-6",
+            "html_url": "https://github.com/testuser/get-team-repo-6",
+            "default_branch": "main",
+        },
+    )
+    repo.published = False
+    db_session.commit()
+
+    dev_member = create_user(
+        db=db_session,
+        github_id=30005,
+        username="member_of_unpub",
+        name="Member Unpub",
+        avatar_url=None,
+        access_token="tok_unpub_mem",
+    )
+    db_session.commit()
+
+    team = RevivalTeam(repository_id=repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member = RevivalTeamMember(team_id=team.id, user_id=dev_member.id)
+    db_session.add(member)
+    db_session.commit()
+
+    # Member accesses team on unpublished repository
+    auth_context.user = dev_member
+    res = client.get(f"/repositories/{repo.id}/revival-team")
+    assert res.status_code == 200
+    assert res.json()["repository_id"] == repo.id
+    assert len(res.json()["members"]) == 1
+
+
+def test_get_revival_team_no_team_exists(client, db_session, test_user, auth_context):
+    """Verify 404 with detail 'Revival team not found' when repository has no team."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 2007,
+            "name": "get-team-repo-7",
+            "full_name": "testuser/get-team-repo-7",
+            "html_url": "https://github.com/testuser/get-team-repo-7",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    auth_context.user = test_user
+    res = client.get(f"/repositories/{repo.id}/revival-team")
+    assert res.status_code == 404
+    assert res.json()["detail"] == "Revival team not found"
+
+
+def test_get_revival_team_excludes_pending_and_rejected_requests(client, db_session, test_user, auth_context):
+    """Verify only approved members appear; pending and rejected requests are excluded."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 2008,
+            "name": "get-team-repo-8",
+            "full_name": "testuser/get-team-repo-8",
+            "html_url": "https://github.com/testuser/get-team-repo-8",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    dev_approved = create_user(db=db_session, github_id=30006, username="dev_appr", name="Appr", avatar_url=None, access_token="tok_a")
+    dev_pending = create_user(db=db_session, github_id=30007, username="dev_pend", name="Pend", avatar_url=None, access_token="tok_p")
+    dev_rejected = create_user(db=db_session, github_id=30008, username="dev_rejd", name="Rejd", avatar_url=None, access_token="tok_r")
+    db_session.commit()
+
+    auth_context.user = dev_approved
+    app_id = client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "Appr"}).json()["id"]
+
+    auth_context.user = dev_pending
+    client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "Pend"})
+
+    auth_context.user = dev_rejected
+    rej_id = client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "Rej"}).json()["id"]
+
+    auth_context.user = test_user
+    client.post(f"/repositories/{repo.id}/revival-requests/{app_id}/approve")
+    client.post(f"/repositories/{repo.id}/revival-requests/{rej_id}/reject")
+
+    res = client.get(f"/repositories/{repo.id}/revival-team")
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data["members"]) == 1
+    assert data["members"][0]["user_id"] == dev_approved.id
+
+    member_usernames = {m["username"] for m in data["members"]}
+    assert "dev_appr" in member_usernames
+    assert "dev_pend" not in member_usernames
+    assert "dev_rejd" not in member_usernames
+
+
+def test_get_revival_team_deterministic_ordering(client, db_session, test_user, auth_context):
+    """Verify members are returned in deterministic order: joined_at ASC."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 2009,
+            "name": "get-team-repo-9",
+            "full_name": "testuser/get-team-repo-9",
+            "html_url": "https://github.com/testuser/get-team-repo-9",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    dev_1 = create_user(db=db_session, github_id=30011, username="order_dev_1", name="Dev 1", avatar_url=None, access_token="tok_1")
+    dev_2 = create_user(db=db_session, github_id=30012, username="order_dev_2", name="Dev 2", avatar_url=None, access_token="tok_2")
+    dev_3 = create_user(db=db_session, github_id=30013, username="order_dev_3", name="Dev 3", avatar_url=None, access_token="tok_3")
+    db_session.commit()
+
+    auth_context.user = dev_1
+    req_1 = client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "1"}).json()["id"]
+    auth_context.user = dev_2
+    req_2 = client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "2"}).json()["id"]
+    auth_context.user = dev_3
+    req_3 = client.post(f"/repositories/{repo.id}/revival-requests", json={"message": "3"}).json()["id"]
+
+    auth_context.user = test_user
+    client.post(f"/repositories/{repo.id}/revival-requests/{req_1}/approve")
+    client.post(f"/repositories/{repo.id}/revival-requests/{req_2}/approve")
+    client.post(f"/repositories/{repo.id}/revival-requests/{req_3}/approve")
+
+    res = client.get(f"/repositories/{repo.id}/revival-team")
+    assert res.status_code == 200
+    members = res.json()["members"]
+    assert len(members) == 3
+    assert members[0]["user_id"] == dev_1.id
+    assert members[1]["user_id"] == dev_2.id
+    assert members[2]["user_id"] == dev_3.id
