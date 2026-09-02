@@ -1,6 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface UserSummary {
+  id?: number;
   github_id: number;
   username: string;
   name: string | null;
@@ -195,6 +196,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(detail);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json();
 }
 
@@ -344,10 +349,24 @@ export const api = {
     try {
       return await request<RevivalTeamResponse>(`/repositories/${repositoryId}/revival-team`);
     } catch (err: any) {
-      if (err.message === "Revival team not found") {
+      if (err.message === "Revival team not found" || err.message === "Repository not found") {
         return null;
       }
       throw err;
     }
+  },
+
+  // Remove Revival Team Member (Owner-only)
+  removeRevivalTeamMember(repositoryId: number, userId: number): Promise<void> {
+    return request<void>(`/repositories/${repositoryId}/revival-team/members/${userId}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Leave Revival Team (Member-only)
+  leaveRevivalTeam(repositoryId: number): Promise<void> {
+    return request<void>(`/repositories/${repositoryId}/revival-team/members/me`, {
+      method: "DELETE",
+    });
   },
 };
