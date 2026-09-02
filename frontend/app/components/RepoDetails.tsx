@@ -9,6 +9,7 @@ import {
   AIInsightsResponse,
   RevivalRequestResponse,
   RevivalTeamResponse,
+  UserSummary,
 } from "@/lib/api";
 import HandoverPage from "./HandoverPage";
 import RevivalTeam from "./RevivalTeam";
@@ -18,6 +19,7 @@ interface RepoDetailsProps {
   onBack: () => void;
   onSyncSuccess: () => void;
   isOwner: boolean;
+  currentUser?: UserSummary | null;
 }
 
 export default function RepoDetails({
@@ -25,6 +27,7 @@ export default function RepoDetails({
   onBack,
   onSyncSuccess,
   isOwner,
+  currentUser = null,
 }: RepoDetailsProps) {
   const [repo, setRepo] = useState<RepositoryResponse | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -73,7 +76,14 @@ export default function RepoDetails({
       const t = await api.getRevivalTeam(repoId);
       setTeam(t);
     } catch (err: any) {
-      setTeamError(err.message || "Failed to load revival team.");
+      if (
+        err.message === "Revival team not found" ||
+        err.message === "Repository not found"
+      ) {
+        setTeam(null);
+      } else {
+        setTeamError(err.message || "Failed to load revival team.");
+      }
     } finally {
       setLoadingTeam(false);
     }
@@ -789,7 +799,10 @@ export default function RepoDetails({
         loading={loadingTeam}
         error={teamError}
         isOwner={isOwner}
+        currentUser={currentUser}
+        repositoryId={repoId}
         onRetry={fetchTeam}
+        onTeamUpdate={fetchTeam}
       />
 
       {/* Owner-only Revival Requests Section */}

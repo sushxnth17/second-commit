@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 import httpx
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -650,3 +650,108 @@ async def get_revival_team(
         owner=TeamUserSummary.model_validate(team.owner) if team.owner else None,
         members=[RevivalTeamMemberResponse.model_validate(m) for m in members],
     )
+
+
+@router.delete(
+    "/{repository_id}/revival-team/members/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def leave_revival_team(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    team = db.query(RevivalTeam).filter(RevivalTeam.repository_id == repository_id).first()
+
+    is_owner = repository.owner_id == current_user.id
+    is_published = repository.published
+
+    if not team:
+        if not is_owner and not is_published:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        raise HTTPException(status_code=404, detail="Revival team not found")
+
+    if team.owner_id == current_user.id:
+        raise HTTPException(
+            status_code=400,
+            detail="Team owner cannot leave the revival team.",
+        )
+
+    member = (
+        db.query(RevivalTeamMember)
+        .filter(
+            RevivalTeamMember.team_id == team.id,
+            RevivalTeamMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not member:
+        if not is_owner and not is_published:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        raise HTTPException(status_code=404, detail="Team member not found")
+
+    try:
+        db.delete(member)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/{repository_id}/revival-team/members/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def remove_revival_team_member(
+    repository_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    team = db.query(RevivalTeam).filter(RevivalTeam.repository_id == repository_id).first()
+
+    if not team:
+        if not repository.published and repository.owner_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        raise HTTPException(status_code=404, detail="Revival team not found")
+
+    # Authoritative RevivalTeam.owner_id check
+    if team.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    if user_id == team.owner_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Team owner cannot be removed from the revival team.",
+        )
+
+    member = (
+        db.query(RevivalTeamMember)
+        .filter(
+            RevivalTeamMember.team_id == team.id,
+            RevivalTeamMember.user_id == user_id,
+        )
+        .first()
+    )
+    if not member:
+        raise HTTPException(status_code=404, detail="Team member not found")
+
+    try:
+        db.delete(member)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

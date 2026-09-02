@@ -243,6 +243,7 @@ export default function Home() {
             }}
             onSyncSuccess={checkAuth}
             isOwner={repos.some((r) => r.id === selectedRepoId)}
+            currentUser={user}
           />
         ) : activeTab === "dashboard" ? (
           <Dashboard
