@@ -63,11 +63,24 @@ export default function RevivalTeam({
         await onTeamUpdate();
       }
     } catch (err: any) {
+      const isStale =
+        err.message === "Team member not found" ||
+        err.message === "Repository not found";
       const msg =
         err.message === "UNAUTHORIZED"
           ? "Authentication required. Please log in again."
+          : isStale
+          ? "This member is no longer in the revival team."
           : err.message || "Failed to remove member. Please try again.";
       setActionError(msg);
+      if (isStale) {
+        setConfirmRemoveId(null);
+        if (onTeamUpdate) {
+          try {
+            await onTeamUpdate();
+          } catch {}
+        }
+      }
     } finally {
       setActionLoading(false);
       setActiveActionId(null);
@@ -89,11 +102,24 @@ export default function RevivalTeam({
         await onTeamUpdate();
       }
     } catch (err: any) {
+      const isStale =
+        err.message === "Team member not found" ||
+        err.message === "Repository not found";
       const msg =
         err.message === "UNAUTHORIZED"
           ? "Authentication required. Please log in again."
+          : isStale
+          ? "You are no longer a member of this revival team."
           : err.message || "Failed to leave team. Please try again.";
       setActionError(msg);
+      if (isStale) {
+        setConfirmLeave(false);
+        if (onTeamUpdate) {
+          try {
+            await onTeamUpdate();
+          } catch {}
+        }
+      }
     } finally {
       setActionLoading(false);
       setActiveActionId(null);

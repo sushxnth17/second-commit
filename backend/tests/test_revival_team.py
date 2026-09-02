@@ -1947,3 +1947,417 @@ def test_membership_operations_respect_authoritative_team_owner_id(client, db_se
 
     # Member is removed
     assert db_session.query(RevivalTeamMember).filter(RevivalTeamMember.team_id == team.id, RevivalTeamMember.user_id == dev_member.id).first() is None
+
+
+# ==============================================================================
+# LIFECYCLE & STALE STATE INTEGRATION TESTS (Commit 3)
+# ==============================================================================
+
+
+def test_owner_remove_lifecycle_complete(client, db_session, test_user, auth_context):
+    """Lifecycle test: Approved revival request -> team member -> owner removes -> 204 -> DB consistency."""
+    # 1. Create repository and approved revival request
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 5001,
+            "name": "lifecycle-owner-remove",
+            "full_name": "testuser/lifecycle-owner-remove",
+            "html_url": "https://github.com/testuser/lifecycle-owner-remove",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    requester = create_user(
+        db=db_session,
+        github_id=50001,
+        username="requester_remove",
+        name="Requester Remove",
+        avatar_url="https://avatar.url/req_rem",
+        access_token="tok_req_rem",
+    )
+    db_session.commit()
+
+    # Submit revival request
+    auth_context.user = requester
+    req_res = client.post(
+        f"/repositories/{repo.id}/revival-requests",
+        json={"message": "I want to help revive this project!"},
+    )
+    assert req_res.status_code == 201
+    request_id = req_res.json()["id"]
+
+    # Owner approves request
+    auth_context.user = test_user
+    appr_res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/approve")
+    assert appr_res.status_code == 200
+
+    # 2. Verify team exists
+    team = db_session.query(RevivalTeam).filter(RevivalTeam.repository_id == repo.id).first()
+    assert team is not None
+    assert team.owner_id == test_user.id
+
+    # 3. Verify requester is a member
+    member = db_session.query(RevivalTeamMember).filter(
+        RevivalTeamMember.team_id == team.id,
+        RevivalTeamMember.user_id == requester.id,
+    ).first()
+    assert member is not None
+
+    team_get = client.get(f"/repositories/{repo.id}/revival-team")
+    assert team_get.status_code == 200
+    assert any(m["user_id"] == requester.id for m in team_get.json()["members"])
+
+    # 4. Owner removes requester
+    del_res = client.delete(f"/repositories/{repo.id}/revival-team/members/{requester.id}")
+
+    # 5. Verify DELETE returns 204
+    assert del_res.status_code == 204
+
+    # 6. GET team no longer contains requester
+    team_get_after = client.get(f"/repositories/{repo.id}/revival-team")
+    assert team_get_after.status_code == 200
+    assert not any(m["user_id"] == requester.id for m in team_get_after.json()["members"])
+
+    # 7. User still exists
+    user_in_db = db_session.query(User).filter(User.id == requester.id).first()
+    assert user_in_db is not None
+    assert user_in_db.username == "requester_remove"
+
+    # 8. RevivalTeam still exists
+    team_in_db = db_session.query(RevivalTeam).filter(RevivalTeam.id == team.id).first()
+    assert team_in_db is not None
+    assert team_in_db.repository_id == repo.id
+    assert team_in_db.owner_id == test_user.id
+
+    # 9. RevivalRequest still exists and remains approved
+    rev_req_in_db = db_session.query(RevivalRequest).filter(RevivalRequest.id == request_id).first()
+    assert rev_req_in_db is not None
+    assert rev_req_in_db.status == "approved"
+
+
+def test_member_leave_lifecycle_complete(client, db_session, test_user, auth_context):
+    """Lifecycle test: Approved revival request -> team member -> member leaves -> 204 -> DB consistency."""
+    # 10. Create repository and approved revival request
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 5002,
+            "name": "lifecycle-member-leave",
+            "full_name": "testuser/lifecycle-member-leave",
+            "html_url": "https://github.com/testuser/lifecycle-member-leave",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    requester = create_user(
+        db=db_session,
+        github_id=50002,
+        username="requester_leave",
+        name="Requester Leave",
+        avatar_url="https://avatar.url/req_leave",
+        access_token="tok_req_leave",
+    )
+    db_session.commit()
+
+    # Submit revival request
+    auth_context.user = requester
+    req_res = client.post(
+        f"/repositories/{repo.id}/revival-requests",
+        json={"message": "I would love to join!"},
+    )
+    assert req_res.status_code == 201
+    request_id = req_res.json()["id"]
+
+    # Owner approves
+    auth_context.user = test_user
+    appr_res = client.post(f"/repositories/{repo.id}/revival-requests/{request_id}/approve")
+    assert appr_res.status_code == 200
+
+    # 11. Verify requester is a member
+    team = db_session.query(RevivalTeam).filter(RevivalTeam.repository_id == repo.id).first()
+    assert team is not None
+    assert db_session.query(RevivalTeamMember).filter(
+        RevivalTeamMember.team_id == team.id,
+        RevivalTeamMember.user_id == requester.id,
+    ).first() is not None
+
+    # 12. Requester leaves
+    auth_context.user = requester
+    leave_res = client.delete(f"/repositories/{repo.id}/revival-team/members/me")
+
+    # 13. Verify DELETE returns 204
+    assert leave_res.status_code == 204
+
+    # 14. Verify requester is no longer a member
+    assert db_session.query(RevivalTeamMember).filter(
+        RevivalTeamMember.team_id == team.id,
+        RevivalTeamMember.user_id == requester.id,
+    ).first() is None
+
+    # 15. User still exists
+    user_in_db = db_session.query(User).filter(User.id == requester.id).first()
+    assert user_in_db is not None
+    assert user_in_db.username == "requester_leave"
+
+    # 16. RevivalTeam still exists
+    team_in_db = db_session.query(RevivalTeam).filter(RevivalTeam.id == team.id).first()
+    assert team_in_db is not None
+
+    # 17. RevivalRequest remains approved
+    rev_req_in_db = db_session.query(RevivalRequest).filter(RevivalRequest.id == request_id).first()
+    assert rev_req_in_db is not None
+    assert rev_req_in_db.status == "approved"
+
+
+def test_stale_remove_member_twice(client, db_session, test_user, auth_context):
+    """18-20. Stale state: Removing the same member twice returns 204 on first, 404 on second."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 5003,
+            "name": "stale-remove-twice",
+            "full_name": "testuser/stale-remove-twice",
+            "html_url": "https://github.com/testuser/stale-remove-twice",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    dev = create_user(db=db_session, github_id=50003, username="dev_stale_1", name="Dev Stale", avatar_url=None, access_token="tok_s1")
+    db_session.commit()
+
+    team = RevivalTeam(repository_id=repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member = RevivalTeamMember(team_id=team.id, user_id=dev.id)
+    db_session.add(member)
+    db_session.commit()
+
+    auth_context.user = test_user
+
+    # 18-19. First remove succeeds
+    res_1 = client.delete(f"/repositories/{repo.id}/revival-team/members/{dev.id}")
+    assert res_1.status_code == 204
+
+    # 20. Second remove returns 404
+    res_2 = client.delete(f"/repositories/{repo.id}/revival-team/members/{dev.id}")
+    assert res_2.status_code == 404
+    assert res_2.json()["detail"] == "Team member not found"
+
+
+def test_stale_member_leave_twice(client, db_session, test_user, auth_context):
+    """21-23. Stale state: Member leaving twice returns 204 on first, 404 on second."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 5004,
+            "name": "stale-leave-twice",
+            "full_name": "testuser/stale-leave-twice",
+            "html_url": "https://github.com/testuser/stale-leave-twice",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    dev = create_user(db=db_session, github_id=50004, username="dev_stale_2", name="Dev Stale 2", avatar_url=None, access_token="tok_s2")
+    db_session.commit()
+
+    team = RevivalTeam(repository_id=repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member = RevivalTeamMember(team_id=team.id, user_id=dev.id)
+    db_session.add(member)
+    db_session.commit()
+
+    auth_context.user = dev
+
+    # 21-22. First leave succeeds
+    res_1 = client.delete(f"/repositories/{repo.id}/revival-team/members/me")
+    assert res_1.status_code == 204
+
+    # 23. Second leave returns 404
+    res_2 = client.delete(f"/repositories/{repo.id}/revival-team/members/me")
+    assert res_2.status_code == 404
+    assert res_2.json()["detail"] == "Team member not found"
+
+
+def test_stale_member_leave_twice_unpublished(client, db_session, test_user, auth_context):
+    """Stale state on unpublished repo: First leave returns 204, second leave returns 404 'Repository not found'."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 5005,
+            "name": "stale-leave-unpublished",
+            "full_name": "testuser/stale-leave-unpublished",
+            "html_url": "https://github.com/testuser/stale-leave-unpublished",
+            "default_branch": "main",
+        },
+    )
+    repo.published = False
+    db_session.commit()
+
+    dev = create_user(db=db_session, github_id=50005, username="dev_stale_unpub", name="Dev Unpub", avatar_url=None, access_token="tok_unpub")
+    db_session.commit()
+
+    team = RevivalTeam(repository_id=repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member = RevivalTeamMember(team_id=team.id, user_id=dev.id)
+    db_session.add(member)
+    db_session.commit()
+
+    auth_context.user = dev
+
+    # First leave succeeds
+    res_1 = client.delete(f"/repositories/{repo.id}/revival-team/members/me")
+    assert res_1.status_code == 204
+
+    # Second leave: user is no longer a member and repo is unpublished -> 404 Repository not found
+    res_2 = client.delete(f"/repositories/{repo.id}/revival-team/members/me")
+    assert res_2.status_code == 404
+    assert res_2.json()["detail"] == "Repository not found"
+
+
+def test_multi_member_owner_removes_one_preserves_others(client, db_session, test_user, auth_context):
+    """24-28. Multi-member: Owner removes one member while other members, owner, and team remain intact."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 5006,
+            "name": "multi-member-team",
+            "full_name": "testuser/multi-member-team",
+            "html_url": "https://github.com/testuser/multi-member-team",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    dev_1 = create_user(db=db_session, github_id=50006, username="multi_dev_1", name="Dev 1", avatar_url=None, access_token="tok_m1")
+    dev_2 = create_user(db=db_session, github_id=50007, username="multi_dev_2", name="Dev 2", avatar_url=None, access_token="tok_m2")
+    dev_3 = create_user(db=db_session, github_id=50008, username="multi_dev_3", name="Dev 3", avatar_url=None, access_token="tok_m3")
+    db_session.commit()
+
+    # 24. Create team with multiple members
+    team = RevivalTeam(repository_id=repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    m1 = RevivalTeamMember(team_id=team.id, user_id=dev_1.id)
+    m2 = RevivalTeamMember(team_id=team.id, user_id=dev_2.id)
+    m3 = RevivalTeamMember(team_id=team.id, user_id=dev_3.id)
+    db_session.add_all([m1, m2, m3])
+    db_session.commit()
+
+    # 25. Owner removes dev_2
+    auth_context.user = test_user
+    res_del = client.delete(f"/repositories/{repo.id}/revival-team/members/{dev_2.id}")
+    assert res_del.status_code == 204
+
+    # 26. Verify other members remain in DB and in API GET response
+    remaining_members = db_session.query(RevivalTeamMember).filter(RevivalTeamMember.team_id == team.id).all()
+    remaining_user_ids = {m.user_id for m in remaining_members}
+    assert dev_1.id in remaining_user_ids
+    assert dev_3.id in remaining_user_ids
+    assert dev_2.id not in remaining_user_ids
+
+    team_res = client.get(f"/repositories/{repo.id}/revival-team")
+    assert team_res.status_code == 200
+    api_member_ids = {m["user_id"] for m in team_res.json()["members"]}
+    assert dev_1.id in api_member_ids
+    assert dev_3.id in api_member_ids
+    assert dev_2.id not in api_member_ids
+
+    # 27. Verify owner remains
+    assert team.owner_id == test_user.id
+    assert team_res.json()["owner"]["id"] == test_user.id
+
+    # 28. Verify team remains
+    team_in_db = db_session.query(RevivalTeam).filter(RevivalTeam.id == team.id).first()
+    assert team_in_db is not None
+    assert team_in_db.repository_id == repo.id
+
+    # dev_2 user account still exists
+    assert db_session.query(User).filter(User.id == dev_2.id).first() is not None
+
+
+def test_owner_integrity_self_removal_rejected(client, db_session, test_user, auth_context):
+    """29-31. Owner integrity: Owner cannot remove themselves; team and owner state remain intact."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 5007,
+            "name": "owner-integrity-repo",
+            "full_name": "testuser/owner-integrity-repo",
+            "html_url": "https://github.com/testuser/owner-integrity-repo",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    team = RevivalTeam(repository_id=repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    auth_context.user = test_user
+
+    # 29-30. Attempt owner self-removal -> fails with 400
+    res = client.delete(f"/repositories/{repo.id}/revival-team/members/{test_user.id}")
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Team owner cannot be removed from the revival team."
+
+    # 31. Verify owner membership/team state remains unchanged
+    team_in_db = db_session.query(RevivalTeam).filter(RevivalTeam.id == team.id).first()
+    assert team_in_db is not None
+    assert team_in_db.owner_id == test_user.id
+
+
+def test_owner_integrity_leave_team_rejected(client, db_session, test_user, auth_context):
+    """Owner integrity: Owner cannot leave team via /members/me; team and owner state remain intact."""
+    repo = create_repository(
+        db=db_session,
+        owner_id=test_user.id,
+        repo={
+            "id": 5008,
+            "name": "owner-leave-integrity-repo",
+            "full_name": "testuser/owner-leave-integrity-repo",
+            "html_url": "https://github.com/testuser/owner-leave-integrity-repo",
+            "default_branch": "main",
+        },
+    )
+    repo.published = True
+    db_session.commit()
+
+    team = RevivalTeam(repository_id=repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    auth_context.user = test_user
+
+    # Attempt leave via /members/me -> fails with 400
+    res = client.delete(f"/repositories/{repo.id}/revival-team/members/me")
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Team owner cannot leave the revival team."
+
+    # Team and owner state remain intact
+    team_in_db = db_session.query(RevivalTeam).filter(RevivalTeam.id == team.id).first()
+    assert team_in_db is not None
+    assert team_in_db.owner_id == test_user.id
