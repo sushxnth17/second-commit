@@ -6,6 +6,11 @@ from .analytics import AnalyticsResponse
 from .ai import AIInsightsResponse
 from .revival_request import RevivalRequestCreate, RevivalRequestResponse
 from .revival_team import RevivalTeamResponse, RevivalTeamMemberResponse, TeamUserSummary
+from .revival_work_item import (
+    RevivalWorkItemCreate,
+    RevivalWorkItemAssigneeSummary,
+    RevivalWorkItemResponse,
+)
 
 __all__ = [
     "RepositoryResponse",
@@ -21,9 +26,7 @@ __all__ = [
     "RevivalTeamResponse",
     "RevivalTeamMemberResponse",
     "TeamUserSummary",
+    "RevivalWorkItemCreate",
+    "RevivalWorkItemAssigneeSummary",
+    "RevivalWorkItemResponse",
 ]
-
-
-
-
-

@@ -11,11 +11,14 @@ from app.models.revival_brief import RevivalBrief
 from app.models.revival_request import RevivalRequest
 from app.models.revival_team import RevivalTeam
 from app.models.revival_team_member import RevivalTeamMember
+from app.models.revival_work_item import RevivalWorkItem
 from app.schemas.repository import RepositoryResponse
 from app.schemas.dashboard import RepositorySummary
 from app.schemas.revival_brief import RevivalBriefResponse, RevivalBriefUpdate
 from app.schemas.revival_request import RevivalRequestCreate, RevivalRequestResponse
 from app.schemas.revival_team import RevivalTeamResponse, TeamUserSummary, RevivalTeamMemberResponse
+from app.schemas.revival_work_item import RevivalWorkItemCreate, RevivalWorkItemResponse
+
 from app.services.repository_service import (
     get_repository_by_github_id,
     create_repository,
@@ -755,3 +758,110 @@ async def remove_revival_team_member(
         raise
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/{repository_id}/revival-team/work-items",
+    response_model=list[RevivalWorkItemResponse],
+)
+async def list_revival_work_items(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    team = db.query(RevivalTeam).filter(RevivalTeam.repository_id == repository_id).first()
+    if not team:
+        if not repository.published and repository.owner_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        raise HTTPException(status_code=404, detail="Revival team not found")
+
+    is_owner = team.owner_id == current_user.id
+    is_member = (
+        db.query(RevivalTeamMember)
+        .filter(
+            RevivalTeamMember.team_id == team.id,
+            RevivalTeamMember.user_id == current_user.id,
+        )
+        .first()
+        is not None
+    )
+
+    if not is_owner and not is_member:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    work_items = (
+        db.query(RevivalWorkItem)
+        .filter(RevivalWorkItem.team_id == team.id)
+        .order_by(RevivalWorkItem.created_at.desc(), RevivalWorkItem.id.desc())
+        .all()
+    )
+
+    return work_items
+
+
+@router.post(
+    "/{repository_id}/revival-team/work-items",
+    response_model=RevivalWorkItemResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_revival_work_item(
+    repository_id: int,
+    item_in: RevivalWorkItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    team = db.query(RevivalTeam).filter(RevivalTeam.repository_id == repository_id).first()
+    if not team:
+        if not repository.published and repository.owner_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        raise HTTPException(status_code=404, detail="Revival team not found")
+
+    # Authoritative RevivalTeam.owner_id check
+    if team.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    # Assignee validation if provided
+    if item_in.assignee_id is not None:
+        assignee_user = db.query(User).filter(User.id == item_in.assignee_id).first()
+        if not assignee_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        is_team_member = (
+            assignee_user.id == team.owner_id
+            or db.query(RevivalTeamMember)
+            .filter(
+                RevivalTeamMember.team_id == team.id,
+                RevivalTeamMember.user_id == assignee_user.id,
+            )
+            .first()
+            is not None
+        )
+        if not is_team_member:
+            raise HTTPException(
+                status_code=400,
+                detail="Assignee must be an active member of the revival team.",
+            )
+
+    try:
+        work_item = RevivalWorkItem(
+            team_id=team.id,
+            title=item_in.title,
+            description=item_in.description,
+            assignee_id=item_in.assignee_id,
+            status="todo",
+        )
+        db.add(work_item)
+        db.commit()
+        db.refresh(work_item)
+    except Exception:
+        db.rollback()
+        raise
+    return work_item

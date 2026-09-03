@@ -43,3 +43,8 @@ class RevivalTeam(Base):
         back_populates="team",
         cascade="all, delete-orphan",
     )
+    work_items = relationship(
+        "RevivalWorkItem",
+        back_populates="team",
+        cascade="all, delete-orphan",
+    )
