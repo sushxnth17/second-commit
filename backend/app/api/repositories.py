@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 import httpx
 from sqlalchemy.exc import IntegrityError
@@ -17,7 +18,11 @@ from app.schemas.dashboard import RepositorySummary
 from app.schemas.revival_brief import RevivalBriefResponse, RevivalBriefUpdate
 from app.schemas.revival_request import RevivalRequestCreate, RevivalRequestResponse
 from app.schemas.revival_team import RevivalTeamResponse, TeamUserSummary, RevivalTeamMemberResponse
-from app.schemas.revival_work_item import RevivalWorkItemCreate, RevivalWorkItemResponse
+from app.schemas.revival_work_item import (
+    RevivalWorkItemCreate,
+    RevivalWorkItemUpdate,
+    RevivalWorkItemResponse,
+)
 
 from app.services.repository_service import (
     get_repository_by_github_id,
@@ -865,3 +870,157 @@ async def create_revival_work_item(
         db.rollback()
         raise
     return work_item
+
+
+@router.patch(
+    "/{repository_id}/revival-team/work-items/{work_item_id}",
+    response_model=RevivalWorkItemResponse,
+)
+async def update_revival_work_item(
+    repository_id: int,
+    work_item_id: int,
+    item_in: RevivalWorkItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    team = db.query(RevivalTeam).filter(RevivalTeam.repository_id == repository_id).first()
+    if not team:
+        if not repository.published and repository.owner_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        raise HTTPException(status_code=404, detail="Revival team not found")
+
+    is_owner = team.owner_id == current_user.id
+    is_member = (
+        db.query(RevivalTeamMember)
+        .filter(
+            RevivalTeamMember.team_id == team.id,
+            RevivalTeamMember.user_id == current_user.id,
+        )
+        .first()
+        is not None
+    )
+
+    if not is_owner and not is_member:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    work_item = (
+        db.query(RevivalWorkItem)
+        .filter(
+            RevivalWorkItem.id == work_item_id,
+            RevivalWorkItem.team_id == team.id,
+        )
+        .first()
+    )
+    if not work_item:
+        raise HTTPException(status_code=404, detail="Work item not found")
+
+    update_data = item_in.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields provided for update",
+        )
+
+    # Authorization: Active members who are not owner can only update status
+    if not is_owner:
+        disallowed_fields = set(update_data.keys()) - {"status"}
+        if disallowed_fields:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Members are only permitted to update status",
+            )
+
+    # Assignee validation if provided
+    if "assignee_id" in update_data:
+        if item_in.assignee_id is not None:
+            assignee_user = db.query(User).filter(User.id == item_in.assignee_id).first()
+            if not assignee_user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            is_team_member = (
+                assignee_user.id == team.owner_id
+                or db.query(RevivalTeamMember)
+                .filter(
+                    RevivalTeamMember.team_id == team.id,
+                    RevivalTeamMember.user_id == assignee_user.id,
+                )
+                .first()
+                is not None
+            )
+            if not is_team_member:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Assignee must be an active member of the revival team.",
+                )
+            work_item.assignee_id = assignee_user.id
+        else:
+            work_item.assignee_id = None
+
+    if "title" in update_data:
+        work_item.title = item_in.title
+
+    if "description" in update_data:
+        work_item.description = item_in.description
+
+    if "status" in update_data:
+        work_item.status = item_in.status
+
+    work_item.updated_at = datetime.utcnow()
+
+    try:
+        db.commit()
+        db.refresh(work_item)
+    except Exception:
+        db.rollback()
+        raise
+
+    return work_item
+
+
+@router.delete(
+    "/{repository_id}/revival-team/work-items/{work_item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_revival_work_item(
+    repository_id: int,
+    work_item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    team = db.query(RevivalTeam).filter(RevivalTeam.repository_id == repository_id).first()
+    if not team:
+        if not repository.published and repository.owner_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        raise HTTPException(status_code=404, detail="Revival team not found")
+
+    # Authoritative RevivalTeam.owner_id check
+    if team.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    work_item = (
+        db.query(RevivalWorkItem)
+        .filter(
+            RevivalWorkItem.id == work_item_id,
+            RevivalWorkItem.team_id == team.id,
+        )
+        .first()
+    )
+    if not work_item:
+        raise HTTPException(status_code=404, detail="Work item not found")
+
+    try:
+        db.delete(work_item)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
