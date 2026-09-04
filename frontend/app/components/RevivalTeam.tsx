@@ -1,7 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { api, RevivalTeamResponse, UserSummary } from "@/lib/api";
+import { useState, useEffect, useCallback } from "react";
+import {
+  api,
+  RevivalTeamResponse,
+  RevivalWorkItemResponse,
+  UserSummary,
+} from "@/lib/api";
 
 interface RevivalTeamProps {
   team: RevivalTeamResponse | null;
@@ -30,6 +35,26 @@ export default function RevivalTeam({
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Work items state
+  const [workItems, setWorkItems] = useState<RevivalWorkItemResponse[]>([]);
+  const [workItemsLoading, setWorkItemsLoading] = useState(false);
+
+  // Create work item state (Owner only)
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newAssigneeId, setNewAssigneeId] = useState<string>("");
+
+  // Edit work item state (Owner only)
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editAssigneeId, setEditAssigneeId] = useState<string>("");
+  const [editStatus, setEditStatus] = useState<string>("todo");
+
+  // Delete confirmation state (Owner only)
+  const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<number | null>(null);
+
   const totalCount = team ? 1 + (team.members?.length || 0) : 0;
   const owner = team?.owner;
   const ownerName = owner ? owner.name || owner.username : "Owner";
@@ -47,6 +72,279 @@ export default function RevivalTeam({
       team?.members?.some((m) => m.user_id === currentUserId) &&
       !isTeamOwner
   );
+
+  const targetRepoId = repositoryId || team?.repository_id;
+
+  const eligibleAssignees = [
+    ...(team?.owner
+      ? [
+          {
+            id: team.owner.id,
+            name: `${team.owner.name || team.owner.username} (Owner)`,
+          },
+        ]
+      : []),
+    ...(team?.members || []).map((m) => {
+      const u = m.user;
+      const memberName =
+        m.name || u?.name || m.username || u?.username || `Member #${m.user_id}`;
+      return {
+        id: m.user_id,
+        name: memberName,
+      };
+    }),
+  ];
+
+  const fetchWorkItems = useCallback(async () => {
+    if (!targetRepoId || (!isTeamOwner && !isTeamMember)) {
+      setWorkItems([]);
+      return;
+    }
+    setWorkItemsLoading(true);
+    try {
+      const items = await api.getRevivalWorkItems(targetRepoId);
+      setWorkItems(items);
+    } catch (err: any) {
+      if (
+        err.message === "Revival team not found" ||
+        err.message === "Repository not found"
+      ) {
+        setWorkItems([]);
+        if (onTeamUpdate) {
+          try {
+            await onTeamUpdate();
+          } catch {}
+        }
+      }
+    } finally {
+      setWorkItemsLoading(false);
+    }
+  }, [targetRepoId, isTeamOwner, isTeamMember, onTeamUpdate]);
+
+  useEffect(() => {
+    fetchWorkItems();
+  }, [fetchWorkItems]);
+
+  const handleCreateWorkItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetRepoId || actionLoading || !isTeamOwner) return;
+
+    const trimmedTitle = newTitle.trim();
+    if (!trimmedTitle) {
+      setActionError("Title cannot be empty.");
+      return;
+    }
+    if (trimmedTitle.length > 200) {
+      setActionError("Title cannot exceed 200 characters.");
+      return;
+    }
+
+    setActionLoading(true);
+    setActiveActionId("create-work-item");
+    setActionError(null);
+
+    try {
+      await api.createRevivalWorkItem(targetRepoId, {
+        title: trimmedTitle,
+        description: newDescription.trim() || undefined,
+        assignee_id: newAssigneeId ? Number(newAssigneeId) : undefined,
+      });
+      setNewTitle("");
+      setNewDescription("");
+      setNewAssigneeId("");
+      setIsAddingItem(false);
+      await fetchWorkItems();
+    } catch (err: any) {
+      const isStale =
+        err.message === "Revival team not found" ||
+        err.message === "Repository not found";
+      const msg =
+        err.message === "UNAUTHORIZED"
+          ? "Authentication required. Please log in again."
+          : isStale
+          ? "The revival team is no longer available."
+          : err.message || "Failed to create work item.";
+      setActionError(msg);
+      if (isStale && onTeamUpdate) {
+        try {
+          await onTeamUpdate();
+        } catch {}
+      }
+    } finally {
+      setActionLoading(false);
+      setActiveActionId(null);
+    }
+  };
+
+  const handleStartEdit = (item: RevivalWorkItemResponse) => {
+    setActionError(null);
+    setConfirmDeleteItemId(null);
+    setEditingItemId(item.id);
+    setEditTitle(item.title);
+    setEditDescription(item.description || "");
+    setEditAssigneeId(item.assignee ? String(item.assignee.id) : "");
+    setEditStatus(item.status);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setActionError(null);
+  };
+
+  const handleSaveEdit = async (workItemId: number) => {
+    if (!targetRepoId || actionLoading || !isTeamOwner) return;
+
+    const trimmedTitle = editTitle.trim();
+    if (!trimmedTitle) {
+      setActionError("Title cannot be empty.");
+      return;
+    }
+    if (trimmedTitle.length > 200) {
+      setActionError("Title cannot exceed 200 characters.");
+      return;
+    }
+
+    setActionLoading(true);
+    setActiveActionId(`edit-${workItemId}`);
+    setActionError(null);
+
+    try {
+      await api.updateRevivalWorkItem(targetRepoId, workItemId, {
+        title: trimmedTitle,
+        description: editDescription.trim() ? editDescription.trim() : null,
+        assignee_id: editAssigneeId ? Number(editAssigneeId) : null,
+        status: editStatus,
+      });
+      setEditingItemId(null);
+      await fetchWorkItems();
+    } catch (err: any) {
+      const isStale =
+        err.message === "Work item not found" ||
+        err.message === "Revival team not found" ||
+        err.message === "Repository not found";
+      const msg =
+        err.message === "UNAUTHORIZED"
+          ? "Authentication required. Please log in again."
+          : isStale
+          ? "This work item is no longer available."
+          : err.message || "Failed to update work item.";
+      setActionError(msg);
+      if (isStale) {
+        setEditingItemId(null);
+        await fetchWorkItems();
+        if (onTeamUpdate) {
+          try {
+            await onTeamUpdate();
+          } catch {}
+        }
+      }
+    } finally {
+      setActionLoading(false);
+      setActiveActionId(null);
+    }
+  };
+
+  const handleMemberStatusChange = async (
+    workItemId: number,
+    newStatus: string
+  ) => {
+    if (!targetRepoId || actionLoading || !isTeamMember) return;
+
+    setActionLoading(true);
+    setActiveActionId(`status-${workItemId}`);
+    setActionError(null);
+
+    try {
+      await api.updateRevivalWorkItem(targetRepoId, workItemId, {
+        status: newStatus,
+      });
+      await fetchWorkItems();
+    } catch (err: any) {
+      const isStale =
+        err.message === "Work item not found" ||
+        err.message === "Revival team not found" ||
+        err.message === "Repository not found";
+      const msg =
+        err.message === "UNAUTHORIZED"
+          ? "Authentication required. Please log in again."
+          : isStale
+          ? "This work item is no longer available."
+          : err.message || "Failed to update status.";
+      setActionError(msg);
+      if (isStale) {
+        await fetchWorkItems();
+        if (onTeamUpdate) {
+          try {
+            await onTeamUpdate();
+          } catch {}
+        }
+      }
+    } finally {
+      setActionLoading(false);
+      setActiveActionId(null);
+    }
+  };
+
+  const handleDeleteWorkItem = async (workItemId: number) => {
+    if (!targetRepoId || actionLoading || !isTeamOwner) return;
+
+    setActionLoading(true);
+    setActiveActionId(`delete-${workItemId}`);
+    setActionError(null);
+
+    try {
+      await api.deleteRevivalWorkItem(targetRepoId, workItemId);
+      setConfirmDeleteItemId(null);
+      await fetchWorkItems();
+    } catch (err: any) {
+      const isStale =
+        err.message === "Work item not found" ||
+        err.message === "Revival team not found" ||
+        err.message === "Repository not found";
+      const msg =
+        err.message === "UNAUTHORIZED"
+          ? "Authentication required. Please log in again."
+          : isStale
+          ? "This work item is no longer available."
+          : err.message || "Failed to delete work item.";
+      setActionError(msg);
+      setConfirmDeleteItemId(null);
+      await fetchWorkItems();
+      if (isStale && onTeamUpdate) {
+        try {
+          await onTeamUpdate();
+        } catch {}
+      }
+    } finally {
+      setActionLoading(false);
+      setActiveActionId(null);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+        return (
+          <span className="px-2 py-0.5 text-[8px] font-mono uppercase font-bold border border-semantic-healthy/30 bg-semantic-healthy/10 text-semantic-healthy">
+            Completed
+          </span>
+        );
+      case "in_progress":
+        return (
+          <span className="px-2 py-0.5 text-[8px] font-mono uppercase font-bold border border-brand-accent/30 bg-brand-accent/10 text-brand-accent">
+            In Progress
+          </span>
+        );
+      case "todo":
+      default:
+        return (
+          <span className="px-2 py-0.5 text-[8px] font-mono uppercase font-bold border border-border-strong bg-surface-secondary/40 text-text-secondary">
+            To Do
+          </span>
+        );
+    }
+  };
+
 
   const handleRemoveMember = async (userId: number) => {
     const targetRepoId = repositoryId || team?.repository_id;
@@ -419,6 +717,479 @@ export default function RevivalTeam({
               </div>
             )}
           </div>
+
+          {/* Work Items Section */}
+          {(isTeamOwner || isTeamMember) && (
+            <div className="border-t border-border-muted pt-6 mt-6">
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-4 select-none">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-mono uppercase tracking-widest text-text-muted font-bold">
+                      REVIVAL WORK ITEMS
+                    </span>
+                    {workItems.length > 0 && (
+                      <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold border border-border-muted bg-surface-secondary/40 text-text-secondary">
+                        {workItems.length}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-text-secondary font-sans mt-0.5">
+                    Tasks and milestones for project revival
+                  </p>
+                </div>
+
+                {isTeamOwner && !isAddingItem && (
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={() => {
+                      setActionError(null);
+                      setIsAddingItem(true);
+                    }}
+                    aria-label="Add new work item"
+                    className="px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider font-bold border border-brand-accent/40 bg-brand-accent/10 text-brand-accent hover:bg-brand-accent/20 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    + Add Work Item
+                  </button>
+                )}
+              </div>
+
+              {/* Create Work Item Inline Form (Owner only) */}
+              {isTeamOwner && isAddingItem && (
+                <form
+                  onSubmit={handleCreateWorkItem}
+                  className="border border-border-strong p-4 bg-surface-secondary/25 mb-4 space-y-3 animate-fade-in"
+                >
+                  <div className="flex items-center justify-between border-b border-border-muted pb-2 select-none">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-text-primary font-bold">
+                      New Work Item
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingItem(false);
+                        setActionError(null);
+                      }}
+                      disabled={actionLoading}
+                      aria-label="Cancel adding work item"
+                      className="text-[10px] font-mono uppercase text-text-muted hover:text-text-primary cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="new-item-title"
+                      className="text-[9px] font-mono uppercase text-text-muted font-bold block mb-1 select-none"
+                    >
+                      Title *
+                    </label>
+                    <input
+                      id="new-item-title"
+                      type="text"
+                      maxLength={200}
+                      required
+                      disabled={actionLoading}
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="e.g. Update deprecated dependencies"
+                      className="w-full bg-surface-base border border-border-strong px-3 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand-accent transition-colors font-sans"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="new-item-desc"
+                      className="text-[9px] font-mono uppercase text-text-muted font-bold block mb-1 select-none"
+                    >
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      id="new-item-desc"
+                      rows={2}
+                      disabled={actionLoading}
+                      value={newDescription}
+                      onChange={(e) => setNewDescription(e.target.value)}
+                      placeholder="Additional context or requirements..."
+                      className="w-full bg-surface-base border border-border-strong px-3 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand-accent transition-colors font-sans resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="new-item-assignee"
+                      className="text-[9px] font-mono uppercase text-text-muted font-bold block mb-1 select-none"
+                    >
+                      Assignee
+                    </label>
+                    <select
+                      id="new-item-assignee"
+                      disabled={actionLoading}
+                      value={newAssigneeId}
+                      onChange={(e) => setNewAssigneeId(e.target.value)}
+                      className="w-full bg-surface-base border border-border-strong px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-brand-accent transition-colors font-sans cursor-pointer"
+                    >
+                      <option value="">Unassigned</option>
+                      {eligibleAssignees.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 select-none">
+                    <button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={() => {
+                        setIsAddingItem(false);
+                        setActionError(null);
+                      }}
+                      aria-label="Cancel new work item"
+                      className="px-3 py-1 text-[9px] font-mono uppercase border border-border-strong bg-surface-base text-text-secondary hover:text-text-primary disabled:opacity-50 cursor-pointer transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={actionLoading || !newTitle.trim()}
+                      aria-label="Create work item"
+                      className="px-3 py-1 text-[9px] font-mono uppercase font-bold border border-brand-accent/40 bg-brand-accent/10 text-brand-accent hover:bg-brand-accent/20 disabled:opacity-50 cursor-pointer transition-all"
+                    >
+                      {actionLoading && activeActionId === "create-work-item"
+                        ? "Creating..."
+                        : "Create Item"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Work Items List / Empty State */}
+              {workItemsLoading && workItems.length === 0 ? (
+                <div className="flex items-center justify-center py-6 gap-2 text-text-muted font-mono text-[10px] select-none">
+                  <span>Loading work items...</span>
+                </div>
+              ) : workItems.length === 0 ? (
+                <div className="border border-dashed border-border-muted p-6 text-center bg-surface-secondary/10 select-none">
+                  <p className="text-xs font-mono uppercase text-text-muted tracking-wider">
+                    No work items yet
+                  </p>
+                  <p className="text-[11px] text-text-secondary font-sans mt-1">
+                    {isTeamOwner
+                      ? "Create the first work item to plan revival tasks."
+                      : "The team owner hasn't created any tasks yet."}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {workItems.map((item) => {
+                    const isEditingThis = editingItemId === item.id;
+                    const isConfirmingDelete = confirmDeleteItemId === item.id;
+                    const isMutatingThis =
+                      actionLoading &&
+                      (activeActionId === `edit-${item.id}` ||
+                        activeActionId === `delete-${item.id}` ||
+                        activeActionId === `status-${item.id}`);
+
+                    const assigneeName = item.assignee
+                      ? item.assignee.name || item.assignee.username
+                      : "Unassigned";
+                    const assigneeAvatar = item.assignee?.avatar_url;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="border border-border-muted p-4 bg-surface-secondary/15 transition-all"
+                      >
+                        {/* Owner Edit Form */}
+                        {isEditingThis ? (
+                          <div className="space-y-3 animate-fade-in">
+                            <div className="flex items-center justify-between border-b border-border-muted pb-1.5 select-none">
+                              <span className="text-[9px] font-mono uppercase font-bold text-brand-accent tracking-wider">
+                                Edit Work Item #{item.id}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={actionLoading}
+                                onClick={handleCancelEdit}
+                                aria-label="Cancel editing"
+                                className="text-[9px] font-mono uppercase text-text-muted hover:text-text-primary cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+
+                            <div>
+                              <label
+                                htmlFor={`edit-title-${item.id}`}
+                                className="text-[8px] font-mono uppercase text-text-muted font-bold block mb-1 select-none"
+                              >
+                                Title *
+                              </label>
+                              <input
+                                id={`edit-title-${item.id}`}
+                                type="text"
+                                maxLength={200}
+                                required
+                                disabled={actionLoading}
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                className="w-full bg-surface-base border border-border-strong px-3 py-1 text-xs text-text-primary font-sans focus:outline-none focus:border-brand-accent"
+                              />
+                            </div>
+
+                            <div>
+                              <label
+                                htmlFor={`edit-desc-${item.id}`}
+                                className="text-[8px] font-mono uppercase text-text-muted font-bold block mb-1 select-none"
+                              >
+                                Description
+                              </label>
+                              <textarea
+                                id={`edit-desc-${item.id}`}
+                                rows={2}
+                                disabled={actionLoading}
+                                value={editDescription}
+                                onChange={(e) =>
+                                  setEditDescription(e.target.value)
+                                }
+                                placeholder="No description provided"
+                                className="w-full bg-surface-base border border-border-strong px-3 py-1 text-xs text-text-primary font-sans focus:outline-none focus:border-brand-accent resize-none"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label
+                                  htmlFor={`edit-assignee-${item.id}`}
+                                  className="text-[8px] font-mono uppercase text-text-muted font-bold block mb-1 select-none"
+                                >
+                                  Assignee
+                                </label>
+                                <select
+                                  id={`edit-assignee-${item.id}`}
+                                  disabled={actionLoading}
+                                  value={editAssigneeId}
+                                  onChange={(e) =>
+                                    setEditAssigneeId(e.target.value)
+                                  }
+                                  className="w-full bg-surface-base border border-border-strong px-2 py-1 text-xs text-text-primary font-sans focus:outline-none focus:border-brand-accent cursor-pointer"
+                                >
+                                  <option value="">Unassigned</option>
+                                  {eligibleAssignees.map((a) => (
+                                    <option key={a.id} value={a.id}>
+                                      {a.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label
+                                  htmlFor={`edit-status-${item.id}`}
+                                  className="text-[8px] font-mono uppercase text-text-muted font-bold block mb-1 select-none"
+                                >
+                                  Status
+                                </label>
+                                <select
+                                  id={`edit-status-${item.id}`}
+                                  disabled={actionLoading}
+                                  value={editStatus}
+                                  onChange={(e) =>
+                                    setEditStatus(e.target.value)
+                                  }
+                                  className="w-full bg-surface-base border border-border-strong px-2 py-1 text-xs text-text-primary font-sans focus:outline-none focus:border-brand-accent cursor-pointer"
+                                >
+                                  <option value="todo">To Do</option>
+                                  <option value="in_progress">
+                                    In Progress
+                                  </option>
+                                  <option value="completed">Completed</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-2 select-none">
+                              <button
+                                type="button"
+                                disabled={actionLoading}
+                                onClick={handleCancelEdit}
+                                aria-label="Cancel edit"
+                                className="px-2.5 py-1 text-[9px] font-mono uppercase border border-border-strong bg-surface-base text-text-secondary hover:text-text-primary disabled:opacity-50 cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actionLoading || !editTitle.trim()}
+                                onClick={() => handleSaveEdit(item.id)}
+                                aria-label={`Save changes to ${item.title}`}
+                                className="px-2.5 py-1 text-[9px] font-mono uppercase font-bold border border-brand-accent/40 bg-brand-accent/10 text-brand-accent hover:bg-brand-accent/20 disabled:opacity-50 cursor-pointer"
+                              >
+                                {isMutatingThis ? "Saving..." : "Save Changes"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Normal Work Item Card View */
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="space-y-1.5 flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <strong className="text-xs font-outfit text-text-primary font-bold break-words">
+                                  {item.title}
+                                </strong>
+                                {/* Status display or member status control */}
+                                {isTeamMember ? (
+                                  <div className="inline-flex items-center gap-1.5 ml-1">
+                                    <select
+                                      aria-label={`Update status for ${item.title}`}
+                                      disabled={actionLoading}
+                                      value={item.status}
+                                      onChange={(e) =>
+                                        handleMemberStatusChange(
+                                          item.id,
+                                          e.target.value
+                                        )
+                                      }
+                                      className="text-[9px] font-mono uppercase font-bold px-2 py-0.5 border border-border-strong bg-surface-base text-text-primary focus:outline-none focus:border-brand-accent cursor-pointer disabled:opacity-50"
+                                    >
+                                      <option value="todo">To Do</option>
+                                      <option value="in_progress">
+                                        In Progress
+                                      </option>
+                                      <option value="completed">
+                                        Completed
+                                      </option>
+                                    </select>
+                                    {isMutatingThis && (
+                                      <span className="text-[8px] font-mono text-brand-accent animate-pulse">
+                                        Updating...
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  getStatusBadge(item.status)
+                                )}
+                              </div>
+
+                              {item.description && (
+                                <p className="text-[11px] text-text-secondary font-sans leading-relaxed whitespace-pre-wrap">
+                                  {item.description}
+                                </p>
+                              )}
+
+                              <div className="flex items-center gap-3 text-[9px] font-mono text-text-muted select-none flex-wrap">
+                                {/* Assignee display */}
+                                <div className="flex items-center gap-1.5">
+                                  <span>Assignee:</span>
+                                  {item.assignee ? (
+                                    <div className="flex items-center gap-1 text-text-secondary">
+                                      {assigneeAvatar && (
+                                        <img
+                                          src={assigneeAvatar}
+                                          alt={assigneeName}
+                                          className="h-3.5 w-3.5 rounded-full object-cover border border-border-muted"
+                                          onError={(e) => {
+                                            (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${assigneeName}`;
+                                          }}
+                                        />
+                                      )}
+                                      <span className="font-bold">
+                                        {assigneeName}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="italic text-text-muted">
+                                      Unassigned
+                                    </span>
+                                  )}
+                                </div>
+
+                                <span>•</span>
+                                <span>
+                                  Created{" "}
+                                  {new Date(
+                                    item.created_at
+                                  ).toLocaleDateString(undefined, {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Owner Controls (Edit & Delete) */}
+                            {isTeamOwner && (
+                              <div className="flex items-center gap-2 self-end sm:self-center select-none shrink-0">
+                                {isConfirmingDelete ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[9px] text-semantic-critical font-mono">
+                                      Delete?
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={actionLoading}
+                                      onClick={() =>
+                                        handleDeleteWorkItem(item.id)
+                                      }
+                                      aria-label={`Confirm deleting ${item.title}`}
+                                      className="px-2 py-0.5 text-[8px] font-mono uppercase font-bold border border-semantic-critical/40 bg-semantic-critical/10 text-semantic-critical hover:bg-semantic-critical/20 disabled:opacity-50 cursor-pointer transition-all"
+                                    >
+                                      {isMutatingThis
+                                        ? "Deleting..."
+                                        : "Confirm"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={actionLoading}
+                                      onClick={() =>
+                                        setConfirmDeleteItemId(null)
+                                      }
+                                      aria-label="Cancel deletion"
+                                      className="px-2 py-0.5 text-[8px] font-mono uppercase border border-border-strong bg-surface-base text-text-secondary hover:text-text-primary disabled:opacity-50 cursor-pointer transition-all"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      disabled={actionLoading}
+                                      onClick={() => handleStartEdit(item)}
+                                      aria-label={`Edit ${item.title}`}
+                                      className="px-2 py-0.5 text-[8px] font-mono uppercase tracking-wider font-bold border border-border-strong bg-surface-base text-text-secondary hover:text-brand-accent hover:border-brand-accent/40 transition-all cursor-pointer disabled:opacity-50"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={actionLoading}
+                                      onClick={() => {
+                                        setActionError(null);
+                                        setEditingItemId(null);
+                                        setConfirmDeleteItemId(item.id);
+                                      }}
+                                      aria-label={`Delete ${item.title}`}
+                                      className="px-2 py-0.5 text-[8px] font-mono uppercase tracking-wider font-bold border border-border-strong bg-surface-base text-text-secondary hover:text-semantic-critical hover:border-semantic-critical/40 hover:bg-semantic-critical/5 transition-all cursor-pointer disabled:opacity-50"
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

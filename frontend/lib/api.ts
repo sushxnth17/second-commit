@@ -92,6 +92,37 @@ export interface RevivalTeamResponse {
   members: RevivalTeamMemberResponse[];
 }
 
+export interface RevivalWorkItemAssigneeSummary {
+  id: number;
+  username: string;
+  name: string | null;
+  avatar_url?: string | null;
+}
+
+export interface RevivalWorkItemResponse {
+  id: number;
+  title: string;
+  description: string | null;
+  assignee: RevivalWorkItemAssigneeSummary | null;
+  status: "todo" | "in_progress" | "completed" | string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RevivalWorkItemCreatePayload {
+  title: string;
+  description?: string | null;
+  assignee_id?: number | null;
+}
+
+export interface RevivalWorkItemUpdatePayload {
+  title?: string;
+  description?: string | null;
+  assignee_id?: number | null;
+  status?: "todo" | "in_progress" | "completed" | string;
+}
+
+
 
 export interface RepositoryResponse {
   id: number;
@@ -368,5 +399,64 @@ export const api = {
     return request<void>(`/repositories/${repositoryId}/revival-team/members/me`, {
       method: "DELETE",
     });
+  },
+
+  // Get Revival Work Items
+  async getRevivalWorkItems(repositoryId: number): Promise<RevivalWorkItemResponse[]> {
+    try {
+      return await request<RevivalWorkItemResponse[]>(
+        `/repositories/${repositoryId}/revival-team/work-items`
+      );
+    } catch (err: any) {
+      if (
+        err.message === "Revival team not found" ||
+        err.message === "Repository not found"
+      ) {
+        return [];
+      }
+      throw err;
+    }
+  },
+
+  // Create Revival Work Item (Owner-only)
+  createRevivalWorkItem(
+    repositoryId: number,
+    payload: RevivalWorkItemCreatePayload
+  ): Promise<RevivalWorkItemResponse> {
+    return request<RevivalWorkItemResponse>(
+      `/repositories/${repositoryId}/revival-team/work-items`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  },
+
+  // Update Revival Work Item (Owner or Member for status)
+  updateRevivalWorkItem(
+    repositoryId: number,
+    workItemId: number,
+    payload: RevivalWorkItemUpdatePayload
+  ): Promise<RevivalWorkItemResponse> {
+    return request<RevivalWorkItemResponse>(
+      `/repositories/${repositoryId}/revival-team/work-items/${workItemId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }
+    );
+  },
+
+  // Delete Revival Work Item (Owner-only)
+  deleteRevivalWorkItem(
+    repositoryId: number,
+    workItemId: number
+  ): Promise<void> {
+    return request<void>(
+      `/repositories/${repositoryId}/revival-team/work-items/${workItemId}`,
+      {
+        method: "DELETE",
+      }
+    );
   },
 };
