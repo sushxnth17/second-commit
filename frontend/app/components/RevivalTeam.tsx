@@ -360,6 +360,7 @@ export default function RevivalTeam({
       if (onTeamUpdate) {
         await onTeamUpdate();
       }
+      await fetchWorkItems();
     } catch (err: any) {
       const isStale =
         err.message === "Team member not found" ||
@@ -378,6 +379,7 @@ export default function RevivalTeam({
             await onTeamUpdate();
           } catch {}
         }
+        await fetchWorkItems();
       }
     } finally {
       setActionLoading(false);
@@ -396,6 +398,7 @@ export default function RevivalTeam({
     try {
       await api.leaveRevivalTeam(targetRepoId);
       setConfirmLeave(false);
+      setWorkItems([]);
       if (onTeamUpdate) {
         await onTeamUpdate();
       }
@@ -412,6 +415,7 @@ export default function RevivalTeam({
       setActionError(msg);
       if (isStale) {
         setConfirmLeave(false);
+        setWorkItems([]);
         if (onTeamUpdate) {
           try {
             await onTeamUpdate();
@@ -978,6 +982,16 @@ export default function RevivalTeam({
                                   className="w-full bg-surface-base border border-border-strong px-2 py-1 text-xs text-text-primary font-sans focus:outline-none focus:border-brand-accent cursor-pointer"
                                 >
                                   <option value="">Unassigned</option>
+                                  {item.assignee &&
+                                    !eligibleAssignees.some(
+                                      (a) => a.id === item.assignee?.id
+                                    ) && (
+                                      <option value={item.assignee.id} disabled>
+                                        {item.assignee.name ||
+                                          item.assignee.username}{" "}
+                                        (Former Member)
+                                      </option>
+                                    )}
                                   {eligibleAssignees.map((a) => (
                                     <option key={a.id} value={a.id}>
                                       {a.name}

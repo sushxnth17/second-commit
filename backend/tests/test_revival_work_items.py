@@ -1735,3 +1735,587 @@ def test_65_response_contains_only_safe_fields(client, db_session, test_user, te
     data = res.json()
     assignee = data["assignee"]
     assert set(assignee.keys()) == {"id", "username", "name", "avatar_url"}
+
+
+# ==============================================================================
+# 15. DATABASE LIFECYCLE & INTEGRITY TESTS
+# ==============================================================================
+
+def test_66_delete_revival_team_cascades_and_deletes_work_items(db_session, test_user, test_repo):
+    """66. Deleting a RevivalTeam cascades to remove all associated RevivalWorkItem rows."""
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    item1 = RevivalWorkItem(team_id=team.id, title="Item 1")
+    item2 = RevivalWorkItem(team_id=team.id, title="Item 2")
+    db_session.add_all([item1, item2])
+    db_session.commit()
+
+    team_id = team.id
+    repo_id = test_repo.id
+    user_id = test_user.id
+
+    db_session.delete(team)
+    db_session.commit()
+
+    db_session.expire_all()
+    # Team is deleted
+    assert db_session.query(RevivalTeam).filter_by(id=team_id).first() is None
+    # Work items are deleted via CASCADE
+    assert db_session.query(RevivalWorkItem).filter_by(team_id=team_id).all() == []
+    # Repository and user remain intact
+    assert db_session.query(Repository).filter_by(id=repo_id).first() is not None
+    assert db_session.query(User).filter_by(id=user_id).first() is not None
+
+
+def test_67_delete_assigned_user_sets_assignee_id_to_null(db_session, test_user, test_repo):
+    """67. Deleting an assigned User at the database level preserves the work item and sets assignee_id to NULL."""
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member_user = create_user(
+        db=db_session,
+        github_id=92001,
+        username="member_to_delete",
+        name="Member To Delete",
+        avatar_url=None,
+        access_token="tok_del_u",
+    )
+    member = RevivalTeamMember(team_id=team.id, user_id=member_user.id)
+    db_session.add(member)
+    db_session.commit()
+
+    item = RevivalWorkItem(team_id=team.id, title="Assigned task", assignee_id=member_user.id)
+    db_session.add(item)
+    db_session.commit()
+
+    item_id = item.id
+    user_to_delete_id = member_user.id
+
+    # Delete the user directly
+    db_session.delete(member_user)
+    db_session.commit()
+
+    db_session.expire_all()
+    # User is gone
+    assert db_session.query(User).filter_by(id=user_to_delete_id).first() is None
+    # Work item still exists
+    persisted_item = db_session.query(RevivalWorkItem).filter_by(id=item_id).first()
+    assert persisted_item is not None
+    # assignee_id was set to NULL via ON DELETE SET NULL
+    assert persisted_item.assignee_id is None
+
+
+def test_68_membership_removal_preserves_work_items(client, db_session, test_user, test_repo, auth_context):
+    """68. Removing a user from RevivalTeamMember preserves their work items, but they cannot be reassigned."""
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member_user = create_user(
+        db=db_session,
+        github_id=92002,
+        username="member_retained_items",
+        name="Retained Member",
+        avatar_url=None,
+        access_token="tok_ret",
+    )
+    member = RevivalTeamMember(team_id=team.id, user_id=member_user.id)
+    db_session.add(member)
+    db_session.commit()
+
+    item = RevivalWorkItem(team_id=team.id, title="Retained item", assignee_id=member_user.id)
+    db_session.add(item)
+    db_session.commit()
+    item_id = item.id
+
+    # Owner removes member via team membership API
+    auth_context.user = test_user
+    res_del_member = client.delete(f"/repositories/{test_repo.id}/revival-team/members/{member_user.id}")
+    assert res_del_member.status_code == 204
+
+    # Work item still exists with original assignee_id
+    db_session.expire_all()
+    persisted_item = db_session.query(RevivalWorkItem).filter_by(id=item_id).first()
+    assert persisted_item is not None
+    assert persisted_item.assignee_id == member_user.id
+
+    # Owner cannot assign removed member to a new work item
+    res_post = client.post(
+        f"/repositories/{test_repo.id}/revival-team/work-items",
+        json={"title": "New item with former member", "assignee_id": member_user.id},
+    )
+    assert res_post.status_code == 400
+    assert res_post.json()["detail"] == "Assignee must be an active member of the revival team."
+
+    # Owner cannot assign removed member in a PATCH update
+    res_patch = client.patch(
+        f"/repositories/{test_repo.id}/revival-team/work-items/{item_id}",
+        json={"assignee_id": member_user.id},
+    )
+    assert res_patch.status_code == 400
+    assert res_patch.json()["detail"] == "Assignee must be an active member of the revival team."
+
+
+# ==============================================================================
+# 16. AUTHORIZATION LIFECYCLE SCENARIOS
+# ==============================================================================
+
+def test_69_lifecycle_scenario_1_full_lifecycle(client, db_session, test_user, test_repo, auth_context):
+    """69. Full lifecycle: create team -> add member -> create item -> member updates status -> owner edits -> owner deletes."""
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member_user = create_user(
+        db=db_session,
+        github_id=92003,
+        username="lifecycle_member",
+        name="Lifecycle Member",
+        avatar_url=None,
+        access_token="tok_lc",
+    )
+    member = RevivalTeamMember(team_id=team.id, user_id=member_user.id)
+    db_session.add(member)
+    db_session.commit()
+
+    # 1. Owner creates work item
+    auth_context.user = test_user
+    post_res = client.post(
+        f"/repositories/{test_repo.id}/revival-team/work-items",
+        json={"title": "Initial Lifecycle Task", "description": "Initial description", "assignee_id": member_user.id},
+    )
+    assert post_res.status_code == 201
+    item_id = post_res.json()["id"]
+
+    # 2. Member updates status to in_progress
+    auth_context.user = member_user
+    patch_member_1 = client.patch(
+        f"/repositories/{test_repo.id}/revival-team/work-items/{item_id}",
+        json={"status": "in_progress"},
+    )
+    assert patch_member_1.status_code == 200
+    assert patch_member_1.json()["status"] == "in_progress"
+
+    # 3. Member updates status to completed
+    patch_member_2 = client.patch(
+        f"/repositories/{test_repo.id}/revival-team/work-items/{item_id}",
+        json={"status": "completed"},
+    )
+    assert patch_member_2.status_code == 200
+    assert patch_member_2.json()["status"] == "completed"
+
+    # 4. Owner edits item title and description
+    auth_context.user = test_user
+    patch_owner = client.patch(
+        f"/repositories/{test_repo.id}/revival-team/work-items/{item_id}",
+        json={"title": "Final Lifecycle Task", "description": "Final detailed description"},
+    )
+    assert patch_owner.status_code == 200
+    assert patch_owner.json()["title"] == "Final Lifecycle Task"
+    assert patch_owner.json()["description"] == "Final detailed description"
+
+    # 5. Owner deletes item
+    del_res = client.delete(f"/repositories/{test_repo.id}/revival-team/work-items/{item_id}")
+    assert del_res.status_code == 204
+    assert del_res.text == ""
+
+    # Item is gone
+    assert db_session.query(RevivalWorkItem).filter_by(id=item_id).first() is None
+
+
+def test_70_lifecycle_scenario_2_removed_member_cannot_update(client, db_session, test_user, test_repo, auth_context):
+    """70. Member removed from team cannot update work item (404 Repository not found)."""
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member_user = create_user(
+        db=db_session,
+        github_id=92004,
+        username="removed_member_updater",
+        name="Removed Member",
+        avatar_url=None,
+        access_token="tok_rmu",
+    )
+    member = RevivalTeamMember(team_id=team.id, user_id=member_user.id)
+    db_session.add(member)
+    item = RevivalWorkItem(team_id=team.id, title="Item to update", status="todo")
+    db_session.add(item)
+    db_session.commit()
+
+    # Owner removes member
+    auth_context.user = test_user
+    del_res = client.delete(f"/repositories/{test_repo.id}/revival-team/members/{member_user.id}")
+    assert del_res.status_code == 204
+
+    # Removed member attempts PATCH
+    auth_context.user = member_user
+    patch_res = client.patch(
+        f"/repositories/{test_repo.id}/revival-team/work-items/{item.id}",
+        json={"status": "in_progress"},
+    )
+    assert patch_res.status_code == 404
+    assert patch_res.json()["detail"] == "Repository not found"
+
+    db_session.refresh(item)
+    assert item.status == "todo"
+
+
+def test_71_lifecycle_scenario_3_member_leaves_then_cannot_update(client, db_session, test_user, test_repo, auth_context):
+    """71. Member leaves team, then cannot update work items (404 Repository not found)."""
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member_user = create_user(
+        db=db_session,
+        github_id=92005,
+        username="leaving_member",
+        name="Leaving Member",
+        avatar_url=None,
+        access_token="tok_lm",
+    )
+    member = RevivalTeamMember(team_id=team.id, user_id=member_user.id)
+    db_session.add(member)
+    item = RevivalWorkItem(team_id=team.id, title="Item before leave", status="todo")
+    db_session.add(item)
+    db_session.commit()
+
+    # Member leaves
+    auth_context.user = member_user
+    leave_res = client.delete(f"/repositories/{test_repo.id}/revival-team/members/me")
+    assert leave_res.status_code == 204
+
+    # Former member attempts PATCH
+    patch_res = client.patch(
+        f"/repositories/{test_repo.id}/revival-team/work-items/{item.id}",
+        json={"status": "in_progress"},
+    )
+    assert patch_res.status_code == 404
+    assert patch_res.json()["detail"] == "Repository not found"
+
+    db_session.refresh(item)
+    assert item.status == "todo"
+
+
+def test_72_lifecycle_scenario_4_assigned_member_removed_cannot_modify_or_be_reassigned(client, db_session, test_user, test_repo, auth_context):
+    """72. Active member assigned to work item, then removed: work item remains, user cannot modify it, user cannot be reassigned."""
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member_user = create_user(
+        db=db_session,
+        github_id=92006,
+        username="assigned_and_removed",
+        name="Assigned And Removed",
+        avatar_url=None,
+        access_token="tok_aar",
+    )
+    member = RevivalTeamMember(team_id=team.id, user_id=member_user.id)
+    db_session.add(member)
+    item = RevivalWorkItem(team_id=team.id, title="Assigned item", assignee_id=member_user.id, status="todo")
+    db_session.add(item)
+    db_session.commit()
+    item_id = item.id
+
+    # Owner removes member
+    auth_context.user = test_user
+    res_del = client.delete(f"/repositories/{test_repo.id}/revival-team/members/{member_user.id}")
+    assert res_del.status_code == 204
+
+    # Work item still exists
+    db_session.expire_all()
+    persisted = db_session.query(RevivalWorkItem).filter_by(id=item_id).first()
+    assert persisted is not None
+    assert persisted.assignee_id == member_user.id
+
+    # Removed user cannot modify it
+    auth_context.user = member_user
+    patch_attempt = client.patch(
+        f"/repositories/{test_repo.id}/revival-team/work-items/{item_id}",
+        json={"status": "in_progress"},
+    )
+    assert patch_attempt.status_code == 404
+
+    # Owner attempts to assign removed user to a new item -> 400
+    auth_context.user = test_user
+    post_attempt = client.post(
+        f"/repositories/{test_repo.id}/revival-team/work-items",
+        json={"title": "Another task", "assignee_id": member_user.id},
+    )
+    assert post_attempt.status_code == 400
+    assert post_attempt.json()["detail"] == "Assignee must be an active member of the revival team."
+
+
+def test_73_lifecycle_scenario_5_repo_owner_not_team_member_denied_all(client, db_session, test_user, test_repo, auth_context):
+    """73. Repository owner who is neither team owner nor team member is denied GET, POST, PATCH, DELETE."""
+    different_team_owner = create_user(
+        db=db_session,
+        github_id=92007,
+        username="lead_owner_73",
+        name="Lead Owner 73",
+        avatar_url=None,
+        access_token="tok_lo73",
+    )
+    db_session.commit()
+
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=different_team_owner.id)
+    db_session.add(team)
+    db_session.commit()
+    item = RevivalWorkItem(team_id=team.id, title="Team Lead Item", status="todo")
+    db_session.add(item)
+    db_session.commit()
+
+    # test_user is repo owner, but NOT team owner and NOT member
+    auth_context.user = test_user
+
+    get_res = client.get(f"/repositories/{test_repo.id}/revival-team/work-items")
+    assert get_res.status_code == 404
+
+    post_res = client.post(
+        f"/repositories/{test_repo.id}/revival-team/work-items",
+        json={"title": "Repo owner post attempt"},
+    )
+    assert post_res.status_code == 404
+
+    patch_res = client.patch(
+        f"/repositories/{test_repo.id}/revival-team/work-items/{item.id}",
+        json={"status": "in_progress"},
+    )
+    assert patch_res.status_code == 404
+
+    del_res = client.delete(f"/repositories/{test_repo.id}/revival-team/work-items/{item.id}")
+    assert del_res.status_code == 404
+
+
+def test_74_lifecycle_scenario_6_multi_repository_cross_access_isolation(client, db_session, test_user, test_repo, auth_context):
+    """74. Two repositories with separate revival teams remain strictly isolated across all operations."""
+    owner_b = create_user(
+        db=db_session,
+        github_id=92008,
+        username="owner_b",
+        name="Owner B",
+        avatar_url=None,
+        access_token="tok_ob",
+    )
+    db_session.commit()
+
+    repo_b = create_repository(
+        db=db_session,
+        owner_id=owner_b.id,
+        repo={
+            "id": 92008,
+            "name": "repo-b",
+            "full_name": "owner_b/repo-b",
+            "html_url": "https://github.com/owner_b/repo-b",
+            "default_branch": "main",
+        },
+    )
+    team_a = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    team_b = RevivalTeam(repository_id=repo_b.id, owner_id=owner_b.id)
+    db_session.add_all([team_a, team_b])
+    db_session.commit()
+
+    item_a = RevivalWorkItem(team_id=team_a.id, title="Item in Team A")
+    item_b = RevivalWorkItem(team_id=team_b.id, title="Item in Team B")
+    db_session.add_all([item_a, item_b])
+    db_session.commit()
+
+    # Owner A attempts actions on Repo B
+    auth_context.user = test_user
+
+    assert client.get(f"/repositories/{repo_b.id}/revival-team/work-items").status_code == 404
+    assert client.post(f"/repositories/{repo_b.id}/revival-team/work-items", json={"title": "Cross POST"}).status_code == 404
+    assert client.patch(f"/repositories/{repo_b.id}/revival-team/work-items/{item_b.id}", json={"status": "in_progress"}).status_code == 404
+    assert client.delete(f"/repositories/{repo_b.id}/revival-team/work-items/{item_b.id}").status_code == 404
+
+    # Owner A attempts to access Item A via Repo B endpoint URL
+    assert client.patch(f"/repositories/{repo_b.id}/revival-team/work-items/{item_a.id}", json={"status": "in_progress"}).status_code == 404
+    assert client.delete(f"/repositories/{repo_b.id}/revival-team/work-items/{item_a.id}").status_code == 404
+
+
+# ==============================================================================
+# 17. STATUS & ORDERING HARDENING TESTS
+# ==============================================================================
+
+def test_75_status_transitions_arbitrary_order(client, db_session, test_user, test_repo, auth_context):
+    """75. Valid transitions between todo, in_progress, and completed can occur in any arbitrary order."""
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member_user = create_user(
+        db=db_session,
+        github_id=92009,
+        username="status_cycler",
+        name="Status Cycler",
+        avatar_url=None,
+        access_token="tok_sc",
+    )
+    member = RevivalTeamMember(team_id=team.id, user_id=member_user.id)
+    db_session.add(member)
+    item = RevivalWorkItem(team_id=team.id, title="Status cycle item", status="todo")
+    db_session.add(item)
+    db_session.commit()
+
+    url = f"/repositories/{test_repo.id}/revival-team/work-items/{item.id}"
+
+    # Member transitions: todo -> in_progress -> completed -> todo
+    auth_context.user = member_user
+    res = client.patch(url, json={"status": "in_progress"})
+    assert res.status_code == 200 and res.json()["status"] == "in_progress"
+
+    res = client.patch(url, json={"status": "completed"})
+    assert res.status_code == 200 and res.json()["status"] == "completed"
+
+    res = client.patch(url, json={"status": "todo"})
+    assert res.status_code == 200 and res.json()["status"] == "todo"
+
+    # Owner transitions: todo -> completed -> in_progress -> todo
+    auth_context.user = test_user
+    res = client.patch(url, json={"status": "completed"})
+    assert res.status_code == 200 and res.json()["status"] == "completed"
+
+    res = client.patch(url, json={"status": "in_progress"})
+    assert res.status_code == 200 and res.json()["status"] == "in_progress"
+
+    res = client.patch(url, json={"status": "todo"})
+    assert res.status_code == 200 and res.json()["status"] == "todo"
+
+    # Invalid status values are rejected with 422
+    for invalid in ["blocked", "done", "closed", ""]:
+        res_inv = client.patch(url, json={"status": invalid})
+        assert res_inv.status_code == 422
+
+
+def test_76_deterministic_tie_breaker_equal_created_at(client, db_session, test_user, test_repo, auth_context):
+    """76. Work items with identical created_at timestamps are sorted deterministically by id DESC."""
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    fixed_time = datetime.utcnow()
+    items = []
+    for i in range(1, 6):
+        items.append(RevivalWorkItem(team_id=team.id, title=f"Tie Item {i}", created_at=fixed_time))
+    db_session.add_all(items)
+    db_session.commit()
+
+    auth_context.user = test_user
+    res = client.get(f"/repositories/{test_repo.id}/revival-team/work-items")
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data) == 5
+
+    ids = [d["id"] for d in data]
+    assert ids == sorted(ids, reverse=True)
+
+
+# ==============================================================================
+# 18. TIMESTAMP & PRIVACY HARDENING TESTS
+# ==============================================================================
+
+def test_77_failed_patch_does_not_modify_updated_at(client, db_session, test_user, test_repo, auth_context):
+    """77. Failed PATCH operations do not alter work_item.updated_at."""
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    member_user = create_user(
+        db=db_session,
+        github_id=92010,
+        username="patch_tester",
+        name="Patch Tester",
+        avatar_url=None,
+        access_token="tok_pt",
+    )
+    member = RevivalTeamMember(team_id=team.id, user_id=member_user.id)
+    db_session.add(member)
+
+    initial_time = datetime.utcnow() - timedelta(days=1)
+    item = RevivalWorkItem(
+        team_id=team.id,
+        title="Unchanged time item",
+        status="todo",
+        created_at=initial_time,
+        updated_at=initial_time,
+    )
+    db_session.add(item)
+    db_session.commit()
+    db_session.refresh(item)
+    expected_updated_at = item.updated_at
+
+    url = f"/repositories/{test_repo.id}/revival-team/work-items/{item.id}"
+
+    # 1. Empty PATCH -> 400
+    auth_context.user = test_user
+    assert client.patch(url, json={}).status_code == 400
+
+    # 2. Invalid status -> 422
+    assert client.patch(url, json={"status": "bogus"}).status_code == 422
+
+    # 3. Blank title -> 422
+    assert client.patch(url, json={"title": "   "}).status_code == 422
+
+    # 4. Member attempting title change -> 403
+    auth_context.user = member_user
+    assert client.patch(url, json={"title": "Member title"}).status_code == 403
+
+    # 5. Invalid assignee -> 400
+    auth_context.user = test_user
+    assert client.patch(url, json={"assignee_id": 999999}).status_code == 404
+
+    db_session.expire_all()
+    persisted = db_session.query(RevivalWorkItem).filter_by(id=item.id).first()
+    assert persisted.updated_at == expected_updated_at
+
+
+def test_78_published_repository_does_not_expose_work_items_to_public(client, db_session, test_user, test_repo, auth_context):
+    """78. Published repository does not make work items publicly readable or modifiable to outsiders."""
+    test_repo.published = True
+    db_session.commit()
+
+    team = RevivalTeam(repository_id=test_repo.id, owner_id=test_user.id)
+    db_session.add(team)
+    db_session.commit()
+
+    item = RevivalWorkItem(team_id=team.id, title="Published repo task", status="todo")
+    db_session.add(item)
+    db_session.commit()
+
+    items_url = f"/repositories/{test_repo.id}/revival-team/work-items"
+    item_url = f"/repositories/{test_repo.id}/revival-team/work-items/{item.id}"
+
+    # 1. Unauthenticated access -> 401 for all
+    auth_context.user = None
+    assert client.get(items_url).status_code == 401
+    assert client.post(items_url, json={"title": "T"}).status_code == 401
+    assert client.patch(item_url, json={"status": "completed"}).status_code == 401
+    assert client.delete(item_url).status_code == 401
+
+    # 2. Authenticated outsider -> 404 for all (privacy preserved)
+    outsider = create_user(
+        db=db_session,
+        github_id=92011,
+        username="published_outsider",
+        name="Outsider",
+        avatar_url=None,
+        access_token="tok_pub_out",
+    )
+    db_session.commit()
+
+    auth_context.user = outsider
+    assert client.get(items_url).status_code == 404
+    assert client.post(items_url, json={"title": "T"}).status_code == 404
+    assert client.patch(item_url, json={"status": "completed"}).status_code == 404
+    assert client.delete(item_url).status_code == 404
+
+    # 3. Team owner -> access allowed
+    auth_context.user = test_user
+    res_owner = client.get(items_url)
+    assert res_owner.status_code == 200
+    assert len(res_owner.json()) == 1
