@@ -13,7 +13,7 @@ from app.models.revival_request import RevivalRequest
 from app.models.revival_team import RevivalTeam
 from app.models.revival_team_member import RevivalTeamMember
 from app.models.revival_work_item import RevivalWorkItem
-from app.schemas.repository import RepositoryResponse
+from app.schemas.repository import RepositoryResponse, RevivalStatusUpdate
 from app.schemas.dashboard import RepositorySummary
 from app.schemas.revival_brief import RevivalBriefResponse, RevivalBriefUpdate
 from app.schemas.revival_request import RevivalRequestCreate, RevivalRequestResponse
@@ -277,6 +277,38 @@ async def unpublish_repository(
         )
 
     repository.published = False
+    db.commit()
+    db.refresh(repository)
+
+    return repository
+
+
+@router.patch("/{repository_id}/revival-status", response_model=RepositoryResponse)
+async def update_revival_status(
+    repository_id: int,
+    payload: RevivalStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repository = (
+        db.query(Repository)
+        .filter(Repository.id == repository_id)
+        .first()
+    )
+
+    if not repository:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found",
+        )
+
+    if repository.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Repository owned by another user",
+        )
+
+    repository.revival_status = payload.status
     db.commit()
     db.refresh(repository)
 

@@ -23,6 +23,7 @@ export interface RepositorySummary {
   health_grade?: string;
   dormancy_status?: string;
   published?: boolean;
+  revival_status?: string;
 }
 
 export interface OwnerSummary {
@@ -124,6 +125,14 @@ export interface RevivalWorkItemUpdatePayload {
 
 
 
+export type RevivalStatus =
+  | "seeking_revival"
+  | "forming_team"
+  | "revival_in_progress"
+  | "revived"
+  | "paused"
+  | "archived";
+
 export interface RepositoryResponse {
   id: number;
   github_repo_id: number;
@@ -142,6 +151,8 @@ export interface RepositoryResponse {
   updated_at: string | null;
   pushed_at: string | null;
   published: boolean;
+  revival_status: RevivalStatus | string;
+  owner_id?: number;
   owner?: OwnerSummary | null;
 }
 
@@ -456,6 +467,20 @@ export const api = {
       `/repositories/${repositoryId}/revival-team/work-items/${workItemId}`,
       {
         method: "DELETE",
+      }
+    );
+  },
+
+  // Update Revival Status (Owner-only)
+  updateRevivalStatus(
+    repositoryId: number,
+    status: RevivalStatus | string
+  ): Promise<RepositoryResponse> {
+    return request<RepositoryResponse>(
+      `/repositories/${repositoryId}/revival-status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
       }
     );
   },

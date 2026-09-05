@@ -49,6 +49,7 @@ def create_repository(
         created_at=created_at,
         updated_at=updated_at,
         pushed_at=pushed_at,
+        revival_status=repo.get("revival_status", "seeking_revival"),
     )
 
     db.add(repository)
