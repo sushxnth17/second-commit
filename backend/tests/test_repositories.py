@@ -94,6 +94,7 @@ def test_get_repositories_endpoint(client, db_session):
     # Check that it returns ONLY the requested keys
     expected_keys = {
         "id",
+        "owner_id",
         "github_repo_id",
         "name",
         "full_name",
@@ -110,6 +111,7 @@ def test_get_repositories_endpoint(client, db_session):
         "updated_at",
         "pushed_at",
         "published",
+        "revival_status",
         "owner",
     }
     assert set(repo_data.keys()) == expected_keys
@@ -122,6 +124,7 @@ def test_get_repositories_endpoint(client, db_session):
     assert repo_data["language"] == "Go"
     assert repo_data["default_branch"] == "main"
     assert repo_data["html_url"] == "https://github.com/endpointuser/repo-alpha"
+    assert repo_data["revival_status"] == "seeking_revival"
 
 
 def test_get_repositories_endpoint_unauthenticated(client):

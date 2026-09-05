@@ -5,6 +5,7 @@ from app.services.dormancy_service import calculate_dormancy
 
 
 class UserSummary(BaseModel):
+    id: int | None = None
     github_id: int
     username: str
     name: str | None
@@ -27,6 +28,7 @@ class RepositorySummary(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     published: bool = False
+    revival_status: str = "seeking_revival"
 
     model_config = ConfigDict(from_attributes=True)
 

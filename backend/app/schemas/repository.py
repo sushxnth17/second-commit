@@ -1,5 +1,28 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
+
+
+ALLOWED_REVIVAL_STATUSES = {
+    "seeking_revival",
+    "forming_team",
+    "revival_in_progress",
+    "revived",
+    "paused",
+    "archived",
+}
+
+
+class RevivalStatusUpdate(BaseModel):
+    status: str
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in ALLOWED_REVIVAL_STATUSES:
+            raise ValueError(
+                f"Status must be one of: {', '.join(sorted(ALLOWED_REVIVAL_STATUSES))}"
+            )
+        return v
 
 
 class RepositoryBase(BaseModel):
@@ -19,6 +42,7 @@ class RepositoryBase(BaseModel):
     updated_at: datetime | None = None
     pushed_at: datetime | None = None
     published: bool = False
+    revival_status: str = "seeking_revival"
 
 
 class OwnerSummary(BaseModel):
@@ -31,6 +55,7 @@ class OwnerSummary(BaseModel):
 
 class RepositoryResponse(RepositoryBase):
     id: int
+    owner_id: int | None = None
     owner: OwnerSummary | None = None
 
     model_config = ConfigDict(from_attributes=True)

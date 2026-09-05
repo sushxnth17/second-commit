@@ -1,4 +1,4 @@
-from .repository import RepositoryResponse
+from .repository import RepositoryResponse, RevivalStatusUpdate, ALLOWED_REVIVAL_STATUSES
 from .dashboard import DashboardResponse, UserSummary, RepositorySummary
 from .health import HealthResponse
 from .dormancy import DormancyResponse
@@ -15,6 +15,8 @@ from .revival_work_item import (
 
 __all__ = [
     "RepositoryResponse",
+    "RevivalStatusUpdate",
+    "ALLOWED_REVIVAL_STATUSES",
     "DashboardResponse",
     "UserSummary",
     "RepositorySummary",

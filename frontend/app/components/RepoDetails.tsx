@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   api,
   RepositoryResponse,
+  RevivalStatus,
   HealthResponse,
   DormancyResponse,
   AIInsightsResponse,
@@ -13,6 +14,48 @@ import {
 } from "@/lib/api";
 import HandoverPage from "./HandoverPage";
 import RevivalTeam from "./RevivalTeam";
+
+const REVIVAL_STATUS_CONFIG: Record<
+  RevivalStatus,
+  { label: string; description: string; badgeClass: string; dotClass: string }
+> = {
+  seeking_revival: {
+    label: "Seeking Revival",
+    description: "Looking for new maintainers and contributors to take this project forward.",
+    badgeClass: "border-brand-accent/30 bg-brand-accent/10 text-brand-accent",
+    dotClass: "bg-brand-accent",
+  },
+  forming_team: {
+    label: "Forming Team",
+    description: "Gathering core team members and assembling the revival group.",
+    badgeClass: "border-blue-500/30 bg-blue-500/10 text-blue-600",
+    dotClass: "bg-blue-500",
+  },
+  revival_in_progress: {
+    label: "Revival in Progress",
+    description: "Active revival development is underway with assigned work items.",
+    badgeClass: "border-indigo-500/30 bg-indigo-500/10 text-indigo-600",
+    dotClass: "bg-indigo-500",
+  },
+  revived: {
+    label: "Revived",
+    description: "Successfully revived, actively maintained, and healthy again.",
+    badgeClass: "border-semantic-healthy/30 bg-semantic-healthy/10 text-semantic-healthy",
+    dotClass: "bg-semantic-healthy",
+  },
+  paused: {
+    label: "Paused",
+    description: "Revival efforts are temporarily on hold.",
+    badgeClass: "border-amber-500/30 bg-amber-500/10 text-amber-600",
+    dotClass: "bg-amber-500",
+  },
+  archived: {
+    label: "Archived",
+    description: "Revival concluded or discontinued; repository preserved for reference.",
+    badgeClass: "border-zinc-500/30 bg-zinc-500/10 text-zinc-600",
+    dotClass: "bg-zinc-500",
+  },
+};
 
 interface RepoDetailsProps {
   repoId: number;
@@ -40,6 +83,35 @@ export default function RepoDetails({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showHandover, setShowHandover] = useState(false);
+
+  // Authoritative owner check: strictly uses authenticated user ID and repository owner_id
+  const isAuthoritativeOwner = Boolean(
+    currentUser?.id != null && repo?.owner_id != null && currentUser.id === repo.owner_id
+  );
+
+  // Revival status states
+  const [selectedStatus, setSelectedStatus] = useState<RevivalStatus | "">("");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusSuccess, setStatusSuccess] = useState(false);
+
+  const handleUpdateStatus = async () => {
+    if (!repo || !selectedStatus || selectedStatus === repo.revival_status) return;
+    setUpdatingStatus(true);
+    setStatusError(null);
+    setStatusSuccess(false);
+    try {
+      const updated = await api.updateRevivalStatus(repo.id, selectedStatus);
+      setRepo(updated);
+      setSelectedStatus((updated.revival_status as RevivalStatus) || selectedStatus);
+      setStatusSuccess(true);
+      setTimeout(() => setStatusSuccess(false), 3000);
+    } catch (err: any) {
+      setStatusError(err.message || "Failed to update revival status.");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   // Local brief and publication states
   const [handoverState, setHandoverState] = useState<"not_started" | "in_progress" | "prepared">("not_started");
@@ -107,6 +179,7 @@ export default function RepoDetails({
         api.getMyRevivalRequest(repoId).catch(() => null),
       ]);
       setRepo(r);
+      setSelectedStatus((r.revival_status as RevivalStatus) || "seeking_revival");
       setHealth(h);
       setDormancy(d);
       setPublicationState(r.published ? "published" : "unpublished");
@@ -387,7 +460,15 @@ export default function RepoDetails({
             </svg>
           </button>
           <div>
-            <h1 className="text-3xl font-outfit text-text-primary font-extrabold tracking-tight">{repo.name}</h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-3xl font-outfit text-text-primary font-extrabold tracking-tight">{repo.name}</h1>
+              {repo.revival_status && REVIVAL_STATUS_CONFIG[repo.revival_status as RevivalStatus] && (
+                <span className={`inline-flex items-center gap-1.5 rounded-none border px-2 py-0.5 text-[9px] font-mono uppercase font-bold ${REVIVAL_STATUS_CONFIG[repo.revival_status as RevivalStatus].badgeClass}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${REVIVAL_STATUS_CONFIG[repo.revival_status as RevivalStatus].dotClass}`} />
+                  {REVIVAL_STATUS_CONFIG[repo.revival_status as RevivalStatus].label}
+                </span>
+              )}
+            </div>
             <p className="text-[10px] text-text-muted font-mono mt-1.5">{repo.full_name}</p>
           </div>
         </div>
@@ -617,6 +698,87 @@ export default function RepoDetails({
                   </li>
                 ))}
               </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revival Status Card */}
+      {repo.revival_status && REVIVAL_STATUS_CONFIG[repo.revival_status as RevivalStatus] && (
+        <div className="border border-border-muted bg-surface-base p-8 mb-10 shadow-sm relative overflow-hidden select-none mt-10">
+          <div className="flex flex-col gap-6 relative z-10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+              <div className="flex-1">
+                <span className="text-[10px] font-mono tracking-widest uppercase text-brand-accent font-bold block mb-2">
+                  REVIVAL LIFECYCLE STATUS
+                </span>
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <h3 className="text-lg font-outfit text-text-primary font-bold">
+                    {REVIVAL_STATUS_CONFIG[repo.revival_status as RevivalStatus].label}
+                  </h3>
+                  <span className={`inline-flex items-center gap-1.5 rounded-none border px-2.5 py-1 text-[10px] font-mono uppercase font-bold ${REVIVAL_STATUS_CONFIG[repo.revival_status as RevivalStatus].badgeClass}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${REVIVAL_STATUS_CONFIG[repo.revival_status as RevivalStatus].dotClass}`} />
+                    {REVIVAL_STATUS_CONFIG[repo.revival_status as RevivalStatus].label}
+                  </span>
+                </div>
+                <p className="text-xs text-text-secondary font-sans leading-relaxed max-w-2xl">
+                  {REVIVAL_STATUS_CONFIG[repo.revival_status as RevivalStatus].description}
+                </p>
+              </div>
+
+              {/* Owner-only Mutation Controls */}
+              {isAuthoritativeOwner && (
+                <div className="shrink-0 flex flex-col sm:items-end gap-2.5 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                    <select
+                      value={selectedStatus || (repo.revival_status as RevivalStatus) || "seeking_revival"}
+                      onChange={(e) => {
+                        setSelectedStatus(e.target.value as RevivalStatus);
+                        setStatusError(null);
+                        setStatusSuccess(false);
+                      }}
+                      disabled={updatingStatus}
+                      className="border border-border-strong bg-surface-secondary text-text-primary px-3 py-2 text-xs font-mono rounded-none outline-none focus-visible:ring-1 focus-visible:ring-brand-accent cursor-pointer"
+                    >
+                      <option value="seeking_revival">Seeking Revival</option>
+                      <option value="forming_team">Forming Team</option>
+                      <option value="revival_in_progress">Revival in Progress</option>
+                      <option value="revived">Revived</option>
+                      <option value="paused">Paused</option>
+                      <option value="archived">Archived</option>
+                    </select>
+
+                    <button
+                      onClick={handleUpdateStatus}
+                      disabled={
+                        updatingStatus ||
+                        !selectedStatus ||
+                        selectedStatus === repo.revival_status
+                      }
+                      className={`flex items-center justify-center gap-2 rounded-none px-4 py-2 text-[10px] font-mono uppercase tracking-widest transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-brand-accent ${
+                        updatingStatus ||
+                        !selectedStatus ||
+                        selectedStatus === repo.revival_status
+                          ? "cursor-not-allowed bg-surface-secondary border border-border-muted text-text-muted"
+                          : "bg-text-primary border border-text-primary text-white hover:bg-brand-accent hover:border-brand-accent cursor-pointer shadow-sm hover:shadow-md"
+                      }`}
+                    >
+                      {updatingStatus ? "Saving..." : "Save Status"}
+                    </button>
+                  </div>
+
+                  {statusError && (
+                    <p className="text-[11px] font-mono text-semantic-critical">
+                      {statusError}
+                    </p>
+                  )}
+                  {statusSuccess && (
+                    <p className="text-[11px] font-mono text-semantic-healthy">
+                      Status updated successfully
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
