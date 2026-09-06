@@ -534,19 +534,19 @@ second-commit/
 
 ### Phase 4: Revival Brief
 
-- [ ] Create Revival Brief database model
-- [ ] Build Revival Brief form
-- [ ] Add original vision field
-- [ ] Add reason stopped field
-- [ ] Add working features
-- [ ] Add incomplete features
-- [ ] Add known problems
-- [ ] Add failed approaches
-- [ ] Add technical debt
-- [ ] Add planned features
-- [ ] Add required skills
-- [ ] Add recommended starting point
-- [ ] Add revival intent selection
+- [x] Create Revival Brief database model
+- [x] Build Revival Brief form
+- [x] Add original vision field
+- [x] Add reason stopped field
+- [x] Add working features
+- [x] Add incomplete features
+- [x] Add known problems
+- [x] Add failed approaches
+- [x] Add technical debt
+- [x] Add planned features
+- [x] Add required skills
+- [x] Add recommended starting point
+- [x] Add revival intent selection
 
 ### Phase 5: Revival Marketplace
 
