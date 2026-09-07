@@ -12,6 +12,15 @@ from .revival_work_item import (
     RevivalWorkItemAssigneeSummary,
     RevivalWorkItemResponse,
 )
+from .revival_roadmap import (
+    RevivalRoadmapTaskCreate,
+    RevivalRoadmapTaskUpdate,
+    RevivalRoadmapTaskResponse,
+    RevivalRoadmapPhaseCreate,
+    RevivalRoadmapPhaseUpdate,
+    RevivalRoadmapPhaseResponse,
+    RevivalRoadmapResponse,
+)
 
 __all__ = [
     "RepositoryResponse",
@@ -33,4 +42,11 @@ __all__ = [
     "RevivalWorkItemUpdate",
     "RevivalWorkItemAssigneeSummary",
     "RevivalWorkItemResponse",
+    "RevivalRoadmapTaskCreate",
+    "RevivalRoadmapTaskUpdate",
+    "RevivalRoadmapTaskResponse",
+    "RevivalRoadmapPhaseCreate",
+    "RevivalRoadmapPhaseUpdate",
+    "RevivalRoadmapPhaseResponse",
+    "RevivalRoadmapResponse",
 ]

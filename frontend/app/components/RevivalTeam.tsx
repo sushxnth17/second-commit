@@ -7,6 +7,7 @@ import {
   RevivalWorkItemResponse,
   UserSummary,
 } from "@/lib/api";
+import RevivalRoadmap from "./RevivalRoadmap";
 
 interface RevivalTeamProps {
   team: RevivalTeamResponse | null;
@@ -1204,6 +1205,13 @@ export default function RevivalTeam({
               )}
             </div>
           )}
+
+          {/* Revival Roadmap Section */}
+          <RevivalRoadmap
+            repositoryId={targetRepoId || 0}
+            team={team}
+            currentUser={currentUser}
+          />
         </div>
       )}
     </div>
