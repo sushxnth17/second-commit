@@ -123,6 +123,55 @@ export interface RevivalWorkItemUpdatePayload {
   status?: "todo" | "in_progress" | "completed" | string;
 }
 
+export interface RevivalRoadmapTaskResponse {
+  id: number;
+  title: string;
+  description: string | null;
+  position: number;
+  status: "todo" | "in_progress" | "completed" | string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RevivalRoadmapPhaseResponse {
+  id: number;
+  title: string;
+  description: string | null;
+  position: number;
+  tasks: RevivalRoadmapTaskResponse[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RevivalRoadmapResponse {
+  phases: RevivalRoadmapPhaseResponse[];
+}
+
+export interface RevivalRoadmapPhaseCreatePayload {
+  title: string;
+  description?: string | null;
+  position?: number | null;
+}
+
+export interface RevivalRoadmapPhaseUpdatePayload {
+  title?: string;
+  description?: string | null;
+  position?: number;
+}
+
+export interface RevivalRoadmapTaskCreatePayload {
+  title: string;
+  description?: string | null;
+  position?: number | null;
+}
+
+export interface RevivalRoadmapTaskUpdatePayload {
+  title?: string;
+  description?: string | null;
+  position?: number;
+  status?: "todo" | "in_progress" | "completed" | string;
+}
+
 
 
 export type RevivalStatus =
@@ -481,6 +530,110 @@ export const api = {
       {
         method: "PATCH",
         body: JSON.stringify({ status }),
+      }
+    );
+  },
+
+  // Get Revival Roadmap (Team Owner or Member)
+  async getRevivalRoadmap(repositoryId: number): Promise<RevivalRoadmapResponse> {
+    try {
+      return await request<RevivalRoadmapResponse>(
+        `/repositories/${repositoryId}/revival-team/roadmap`
+      );
+    } catch (err: any) {
+      if (
+        err.message === "Revival team not found" ||
+        err.message === "Repository not found"
+      ) {
+        return { phases: [] };
+      }
+      throw err;
+    }
+  },
+
+  // Create Revival Roadmap Phase (Owner-only)
+  createRevivalRoadmapPhase(
+    repositoryId: number,
+    payload: RevivalRoadmapPhaseCreatePayload
+  ): Promise<RevivalRoadmapPhaseResponse> {
+    return request<RevivalRoadmapPhaseResponse>(
+      `/repositories/${repositoryId}/revival-team/roadmap/phases`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  },
+
+  // Update Revival Roadmap Phase (Owner-only)
+  updateRevivalRoadmapPhase(
+    repositoryId: number,
+    phaseId: number,
+    payload: RevivalRoadmapPhaseUpdatePayload
+  ): Promise<RevivalRoadmapPhaseResponse> {
+    return request<RevivalRoadmapPhaseResponse>(
+      `/repositories/${repositoryId}/revival-team/roadmap/phases/${phaseId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }
+    );
+  },
+
+  // Delete Revival Roadmap Phase (Owner-only)
+  deleteRevivalRoadmapPhase(
+    repositoryId: number,
+    phaseId: number
+  ): Promise<void> {
+    return request<void>(
+      `/repositories/${repositoryId}/revival-team/roadmap/phases/${phaseId}`,
+      {
+        method: "DELETE",
+      }
+    );
+  },
+
+  // Create Revival Roadmap Task (Owner-only)
+  createRevivalRoadmapTask(
+    repositoryId: number,
+    phaseId: number,
+    payload: RevivalRoadmapTaskCreatePayload
+  ): Promise<RevivalRoadmapTaskResponse> {
+    return request<RevivalRoadmapTaskResponse>(
+      `/repositories/${repositoryId}/revival-team/roadmap/phases/${phaseId}/tasks`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  },
+
+  // Update Revival Roadmap Task (Owner or Active Member for status)
+  updateRevivalRoadmapTask(
+    repositoryId: number,
+    phaseId: number,
+    taskId: number,
+    payload: RevivalRoadmapTaskUpdatePayload
+  ): Promise<RevivalRoadmapTaskResponse> {
+    return request<RevivalRoadmapTaskResponse>(
+      `/repositories/${repositoryId}/revival-team/roadmap/phases/${phaseId}/tasks/${taskId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }
+    );
+  },
+
+  // Delete Revival Roadmap Task (Owner-only)
+  deleteRevivalRoadmapTask(
+    repositoryId: number,
+    phaseId: number,
+    taskId: number
+  ): Promise<void> {
+    return request<void>(
+      `/repositories/${repositoryId}/revival-team/roadmap/phases/${phaseId}/tasks/${taskId}`,
+      {
+        method: "DELETE",
       }
     );
   },

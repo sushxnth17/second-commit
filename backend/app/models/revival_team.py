@@ -48,3 +48,9 @@ class RevivalTeam(Base):
         back_populates="team",
         cascade="all, delete-orphan",
     )
+    roadmap_phases = relationship(
+        "RevivalRoadmapPhase",
+        back_populates="team",
+        cascade="all, delete-orphan",
+        order_by="RevivalRoadmapPhase.position.asc(), RevivalRoadmapPhase.id.asc()",
+    )

@@ -23,6 +23,16 @@ from app.schemas.revival_work_item import (
     RevivalWorkItemUpdate,
     RevivalWorkItemResponse,
 )
+from app.schemas.revival_roadmap import (
+    RevivalRoadmapPhaseCreate,
+    RevivalRoadmapPhaseUpdate,
+    RevivalRoadmapPhaseResponse,
+    RevivalRoadmapTaskCreate,
+    RevivalRoadmapTaskUpdate,
+    RevivalRoadmapTaskResponse,
+    RevivalRoadmapResponse,
+)
+from app.services import revival_roadmap_service
 
 from app.services.repository_service import (
     get_repository_by_github_id,
@@ -1055,4 +1065,124 @@ async def delete_revival_work_item(
         db.rollback()
         raise
 
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/{repository_id}/revival-team/roadmap",
+    response_model=RevivalRoadmapResponse,
+)
+async def get_revival_roadmap(
+    repository_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return revival_roadmap_service.get_roadmap(db, repository_id, current_user)
+
+
+@router.post(
+    "/{repository_id}/revival-team/roadmap/phases",
+    response_model=RevivalRoadmapPhaseResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_revival_roadmap_phase(
+    repository_id: int,
+    phase_in: RevivalRoadmapPhaseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    phase = revival_roadmap_service.create_phase(db, repository_id, phase_in, current_user)
+    return RevivalRoadmapPhaseResponse(
+        id=phase.id,
+        title=phase.title,
+        description=phase.description,
+        position=phase.position,
+        tasks=[],
+        created_at=phase.created_at,
+        updated_at=phase.updated_at,
+    )
+
+
+@router.patch(
+    "/{repository_id}/revival-team/roadmap/phases/{phase_id}",
+    response_model=RevivalRoadmapPhaseResponse,
+)
+async def update_revival_roadmap_phase(
+    repository_id: int,
+    phase_id: int,
+    phase_in: RevivalRoadmapPhaseUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    phase = revival_roadmap_service.update_phase(db, repository_id, phase_id, phase_in, current_user)
+    sorted_tasks = sorted(phase.tasks, key=lambda t: (t.position, t.id))
+    return RevivalRoadmapPhaseResponse(
+        id=phase.id,
+        title=phase.title,
+        description=phase.description,
+        position=phase.position,
+        tasks=[RevivalRoadmapTaskResponse.model_validate(t) for t in sorted_tasks],
+        created_at=phase.created_at,
+        updated_at=phase.updated_at,
+    )
+
+
+@router.delete(
+    "/{repository_id}/revival-team/roadmap/phases/{phase_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_revival_roadmap_phase(
+    repository_id: int,
+    phase_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    revival_roadmap_service.delete_phase(db, repository_id, phase_id, current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{repository_id}/revival-team/roadmap/phases/{phase_id}/tasks",
+    response_model=RevivalRoadmapTaskResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_revival_roadmap_task(
+    repository_id: int,
+    phase_id: int,
+    task_in: RevivalRoadmapTaskCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = revival_roadmap_service.create_task(db, repository_id, phase_id, task_in, current_user)
+    return RevivalRoadmapTaskResponse.model_validate(task)
+
+
+@router.patch(
+    "/{repository_id}/revival-team/roadmap/phases/{phase_id}/tasks/{task_id}",
+    response_model=RevivalRoadmapTaskResponse,
+)
+async def update_revival_roadmap_task(
+    repository_id: int,
+    phase_id: int,
+    task_id: int,
+    task_in: RevivalRoadmapTaskUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = revival_roadmap_service.update_task(db, repository_id, phase_id, task_id, task_in, current_user)
+    return RevivalRoadmapTaskResponse.model_validate(task)
+
+
+@router.delete(
+    "/{repository_id}/revival-team/roadmap/phases/{phase_id}/tasks/{task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_revival_roadmap_task(
+    repository_id: int,
+    phase_id: int,
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    revival_roadmap_service.delete_task(db, repository_id, phase_id, task_id, current_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
